@@ -178,6 +178,15 @@
   @keyframes pulinho{0%,100%{transform:translateY(0)}38%{transform:translateY(-9px)}}
   @media (prefers-reduced-motion: reduce){ .palco[data-larissa="feliz"] .halo{animation:none} }
 
+  .vozes{display:flex; flex-wrap:wrap; gap:7px}
+  .vozbt{
+    border:1.5px solid var(--line); background:var(--surface); color:var(--ink-2);
+    padding:7px 13px; border-radius:999px; font-size:13.5px; font-weight:600;
+  }
+  .vozbt:hover{border-color:var(--accent)}
+  .vozbt.atual{border-color:transparent; background:var(--accent); color:var(--accent-ink)}
+  .vozbt[disabled]{opacity:.55}
+
   .stack{display:flex; flex-direction:column; gap:16px}
   .stack-s{display:flex; flex-direction:column; gap:9px}
   .row{display:flex; align-items:center; gap:10px; flex-wrap:wrap}
@@ -1075,6 +1084,19 @@ async function gerarVoz(texto){
   return URL.createObjectURL(pcmParaWav(bytes.buffer, taxa));
 }
 
+/* Gerar voz leva alguns segundos. Se a frase ja esta prevista — a dica da
+   trilha, por exemplo — da para preparar em silencio enquanto a pessoa le,
+   e o clique fica instantaneo. */
+async function aquecerVoz(texto){
+  if(!SERVIDOR || CFG.natural === false || !texto) return;
+  const chave = (CFG.vozIA || "Kore") + "|" + texto;
+  if(cacheVoz.has(chave)) return;
+  try{
+    const url = await gerarVoz(texto);
+    if(url) cacheVoz.set(chave, url);
+  }catch(e){}
+}
+
 function pararVoz(){
   try{ tocando?.pause(); }catch(e){}
   tocando = null;
@@ -1110,7 +1132,7 @@ async function dizer(texto, reserva){
     a.onplay = () => Larissa.fala(true);
     a.onended = () => { Larissa.fala(false); tocando = null; };
     a.onerror = () => { Larissa.fala(false); tocando = null; reserva(); };
-    await a.play();
+    await a.play();                 // resolve quando o som comeca, nao quando acaba
   }catch(e){ reserva(); }
 }
 
@@ -1485,11 +1507,19 @@ function verTrilha(){
     h("div", {class:"balao"}, h("div", {class:"texto"},
       h("span", {class:"fala"}, dica),
       h("div", {class:"acoes"},
-        h("button", {class:"btn sm", onclick:() => falarPT(dica)}, "🔊 Ouvir a Larissa"),
+        h("button", {class:"btn sm", onclick: async ev => {
+          const b = ev.currentTarget;
+          b.disabled = true;
+          b.replaceChildren(h("span", {class:"spin"}), document.createTextNode(" preparando a voz…"));
+          try{ await falarPT(dica); }catch(e){}
+          b.disabled = false; b.textContent = "🔊 Ouvir a Larissa";
+        }}, "🔊 Ouvir a Larissa"),
         p ? h("button", {class:"btn sm primary", onclick:() => { licaoAberta = p.id; rotear(); }}, "Ir para a lição") : null))),
     palco());
 
   pintar(recado, hero, h("div", {class:"mods"}, ...mods));
+  // enquanto a pessoa le a trilha, a voz da dica ja vai ficando pronta
+  setTimeout(() => aquecerVoz(dica), 400);
 }
 
 /* ---------- Lição ----------
@@ -2184,16 +2214,22 @@ function verAjustes(){
         h("button", {"aria-pressed": CFG.natural === false,
           onclick:() => { CFG.natural = false; gravarCfg(); rotear(); }}, "Voz do aparelho")),
       CFG.natural !== false
-        ? h("div", {class:"stack-s", style:"gap:6px"},
-            h("label", {for:"vozia", style:"font-size:13.5px; font-weight:600"}, "Qual voz"),
-            (() => {
-              const sel = h("select", {class:"inp", id:"vozia"},
-                ...VOZES_IA.map(v => h("option", {value:v, selected: (CFG.vozIA||"Kore") === v ? true : null}, v)));
-              sel.addEventListener("change", () => { CFG.vozIA = sel.value; gravarCfg(); });
-              return sel;
-            })(),
-            h("button", {class:"btn sm", style:"align-self:flex-start",
-              onclick:() => falarPT("Oi! Sou a Larissa. Vamos estudar juntos hoje?")}, "🔊 Testar esta voz"))
+        ? h("div", {class:"stack-s", style:"gap:8px"},
+            h("span", {style:"font-size:13.5px; font-weight:600"}, "Qual voz — toque para ouvir"),
+            h("div", {class:"vozes"},
+              ...VOZES_IA.map(v => h("button", {
+                class:"vozbt" + ((CFG.vozIA || "Kore") === v ? " atual" : ""),
+                onclick: async ev => {
+                  const b = ev.currentTarget;
+                  CFG.vozIA = v; gravarCfg();
+                  b.parentElement.querySelectorAll(".vozbt").forEach(x => x.classList.toggle("atual", x === b));
+                  const antes = b.textContent;
+                  b.disabled = true; b.textContent = "…";
+                  try{ await falarPT("Oi! Sou a Larissa. Vamos estudar juntos hoje?"); }catch(e){}
+                  b.disabled = false; b.textContent = antes;
+                }}, v))),
+            h("p", {class:"lead", style:"font-size:12.5px"},
+              "A primeira vez que ela diz uma frase leva alguns segundos para gerar; depois aquela frase toca na hora."))
         : null,
 
       h("span", {class:"eyebrow", style:"margin-top:8px"}, "Reserva: voz do aparelho"),
