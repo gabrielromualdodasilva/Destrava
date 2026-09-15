@@ -50,6 +50,20 @@ export default {
       return new Response(JSON.stringify({ chave: Boolean(env.GEMINI_KEY) }), { headers: livre });
     }
 
+    // Quais modelos esta chave pode usar. O Google aposenta modelo sem
+    // aviso, entao a lista vem dele, nao de uma constante no codigo.
+    if (url.pathname === "/api/models") {
+      if (!env.GEMINI_KEY) return new Response("[]", { status: 503, headers: livre });
+      const r = await fetch(`${GEMINI}?key=${env.GEMINI_KEY}&pageSize=200`);
+      const d = await r.json().catch(() => ({}));
+      const lista = (d.models || [])
+        .filter(m => (m.supportedGenerationMethods || []).includes("generateContent"))
+        .map(m => ({ id: String(m.name || "").replace("models/", ""), nome: m.displayName || "" }));
+      livre.set("content-type", "application/json");
+      livre.set("cache-control", "max-age=3600");
+      return new Response(JSON.stringify(lista), { status: r.status, headers: livre });
+    }
+
     if (url.pathname.startsWith("/api/gemini/")) {
       if (request.method !== "POST")
         return new Response("Use POST.", { status: 405, headers: livre });

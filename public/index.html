@@ -495,7 +495,7 @@ const PROXY = location.hostname.endsWith(".workers.dev")
   : "https://destravaingles.gabriel-silva-62c.workers.dev";
 
 function rotaIA(acao, sse){
-  const m = encodeURIComponent(CFG.modelo);
+  const m = encodeURIComponent(modeloEmUso());
   if(SERVIDOR) return `${PROXY}/api/gemini/${m}:${acao}` + (sse ? "?alt=sse" : "");
   return `${API_DIRETA}/${m}:${acao}?` + (sse ? "alt=sse&" : "") + `key=${encodeURIComponent(CFG.chave)}`;
 }
@@ -508,15 +508,23 @@ async function sondarServidor(){
     SERVIDOR = !!(d && d.chave);
   }catch(e){}   // arquivo local, ou offline: segue no modo chave-no-aparelho
 }
+/* Apelidos "-latest": o Google os mantem apontando para a versao atual,
+   entao esta lista nao envelhece quando um modelo e aposentado. */
 const MODELOS = [
-  {v:"gemini-2.5-flash",      r:"2.5 Flash — equilibrado (recomendado)"},
-  {v:"gemini-2.5-flash-lite", r:"2.5 Flash-Lite — mais barato e rápido"},
-  {v:"gemini-2.5-pro",        r:"2.5 Pro — mais capaz, mais lento"},
-  {v:"gemini-2.0-flash",      r:"2.0 Flash — alternativa estável"},
+  {v:"gemini-flash-lite-latest", r:"Flash-Lite — rápido e estável (recomendado)"},
+  {v:"gemini-flash-latest",      r:"Flash — respostas melhores, às vezes congestionado"},
+  {v:"gemini-3-flash-preview",   r:"Gemini 3 Flash — versão de testes"},
+  {v:"gemini-pro-latest",        r:"Pro — o mais capaz, costuma estourar a cota gratuita"},
 ];
 
+// Quando o modelo escolhido esta congestionado, a conversa continua neste.
+const RESERVA = "gemini-flash-lite-latest";
+let modeloReserva = false;
+const modeloEmUso = () => modeloReserva ? RESERVA : CFG.modelo;
+
 const temChave = () => SERVIDOR || !!(CFG.chave && CFG.chave.trim());
-const pensa25 = m => /2\.5/.test(m);
+// Os modelos Pro pensam sempre; so os Flash aceitam pensar zero.
+const aceitaSemPensar = m => !/pro/i.test(m);
 
 function corpo({prompt, turnos, sistema, json, rapido}){
   const b = {
@@ -527,7 +535,7 @@ function corpo({prompt, turnos, sistema, json, rapido}){
   };
   if(sistema) b.systemInstruction = {parts:[{text:sistema}]};
   if(json) b.generationConfig.responseMimeType = "application/json";
-  if(rapido && pensa25(CFG.modelo)) b.generationConfig.thinkingConfig = {thinkingBudget:0};
+  if(rapido && aceitaSemPensar(modeloEmUso())) b.generationConfig.thinkingConfig = {thinkingBudget:0};
   return b;
 }
 
@@ -541,13 +549,13 @@ function traduzErro(status, texto){
     return new ErroIA("chave", "Chave da API inválida. Confira em Ajustes.");
   if(status === 400) return new ErroIA("pedido", "O Gemini recusou o pedido. Tente de novo ou troque o modelo em Ajustes.");
   if(status === 403) return new ErroIA("chave", "Essa chave não tem permissão para a API Gemini. Gere outra no Google AI Studio.");
-  if(status === 404) return new ErroIA("modelo", `O modelo "${CFG.modelo}" não existe para essa chave. Escolha outro em Ajustes.`);
+  if(status === 404) return new ErroIA("modelo", `O modelo "${modeloEmUso()}" não foi encontrado. Escolha outro em Ajustes.`);
   if(status === 429) return new ErroIA("limite", "Você bateu o limite de uso do Gemini. Espere alguns minutos.");
-  if(status === 503) return new ErroIA("fora", "O Gemini está sobrecarregado agora. Tente daqui a pouco.");
+  if(status === 503) return new ErroIA("fora", "Esse modelo está congestionado. Tente de novo, ou troque de modelo em Ajustes.");
   return new ErroIA("rede", "Não consegui falar com o Gemini. Confira sua internet.");
 }
 
-async function pedir(opts){
+async function pedirUmaVez(opts){
   if(!temChave()) throw new ErroIA("chave", "Falta a chave da API. Vá em Ajustes.");
   let r;
   try{
@@ -569,7 +577,7 @@ async function pedir(opts){
   return txt;
 }
 
-async function pedirStream(opts, onTexto){
+async function pedirStreamUmaVez(opts, onTexto){
   if(!temChave()) throw new ErroIA("chave", "Falta a chave da API. Vá em Ajustes.");
   let r;
   try{
@@ -610,6 +618,26 @@ async function pedirStream(opts, onTexto){
   }
   if(!todo.trim()) throw new ErroIA("vazio", "Veio vazio. Tente de novo.");
   return todo.trim();
+}
+
+const congestionado = e => e?.codigo === "fora" || e?.codigo === "limite";
+
+async function pedir(opts){
+  try{ return await pedirUmaVez(opts); }
+  catch(e){
+    if(!congestionado(e) || modeloEmUso() === RESERVA) throw e;
+    modeloReserva = true;                    // segue no reserva pelo resto da sessão
+    return await pedirUmaVez(opts);
+  }
+}
+
+async function pedirStream(opts, onTexto){
+  try{ return await pedirStreamUmaVez(opts, onTexto); }
+  catch(e){
+    if(!congestionado(e) || modeloEmUso() === RESERVA) throw e;
+    modeloReserva = true;
+    return await pedirStreamUmaVez(opts, onTexto);
+  }
 }
 
 /* Lê JSON tolerante: o texto inteiro, o miolo de uma cerca ``` ou do 1º { ao último }. */
