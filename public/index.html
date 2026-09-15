@@ -2200,30 +2200,41 @@ function verAjustes(){
       h("p", {class:"lead", style:"font-size:12.5px"},
         "As vozes disponíveis vêm do seu aparelho, não do app. No Chrome do Android as melhores costumam ser as do Google; no iPhone, Samantha.")),
 
+    /* Com a chave no servidor, esse painel nao serve para o aluno: ele nao
+       tem o que configurar. So o administrador ve, e so o que ele pode mexer. */
+    (SERVIDOR && !ehAdmin()) ? null :
     h("div", {class:"panel stack-s"},
-      h("span", {class:"eyebrow"}, "Conexão com o Gemini"),
+      h("span", {class:"eyebrow"}, SERVIDOR ? "Modelo do Gemini" : "Conexão com o Gemini"),
       SERVIDOR
-        ? h("div", {class:"note"}, h("span", {}, "🔒"),
-            h("span", {}, h("b", {}, "A chave está no servidor. "),
-              "Este site usa a chave guardada no Cloudflare, então você não precisa digitar nada — em nenhum aparelho. O campo abaixo fica de reserva, para o caso de o servidor ficar sem chave."))
-        : null,
-      h("label", {for:"chave", style:"font-size:13.5px; font-weight:600"}, "Chave da API"),
-      chave,
-      h("p", {class:"lead", style:"font-size:12.5px"},
-        "Pegue a sua em ", h("a", {href:"https://aistudio.google.com/apikey", target:"_blank", rel:"noopener"}, "aistudio.google.com/apikey"), "."),
-      h("label", {for:"modelo", style:"font-size:13.5px; font-weight:600; margin-top:4px"}, "Modelo"),
-      modelo,
-      h("p", {class:"lead", style:"font-size:12.5px"},
-        "Se aparecer erro dizendo que o modelo não existe, escolha outro aqui."),
-      h("div", {class:"row"},
-        h("button", {class:"btn primary", onclick:() => {
-          CFG.chave = chave.value.trim(); CFG.modelo = modelo.value;
-          CFG.voz = voz.value; CFG.taxa = Number(taxa.value);
-          gravarCfg();
-          salvo.hidden = false; setTimeout(() => { salvo.hidden = true; }, 2200);
-        }}, "Salvar"),
-        h("button", {class:"btn", onclick: ev => testar(ev.currentTarget, chave.value.trim(), modelo.value)}, "Testar conexão"),
-        salvo)),
+        ? h("div", {class:"stack-s"},
+            h("label", {for:"modelo", style:"font-size:13.5px; font-weight:600"}, "Qual modelo responde"),
+            modelo,
+            h("p", {class:"lead", style:"font-size:12.5px"},
+              "A chave já está guardada no servidor — ninguém precisa digitar nada. Se um modelo estiver congestionado, o app troca sozinho pelo reserva; trocar aqui é só se você quiser fixar outro."),
+            h("div", {class:"row"},
+              h("button", {class:"btn primary", onclick:() => {
+                CFG.modelo = modelo.value; gravarCfg();
+                salvo.hidden = false; setTimeout(() => { salvo.hidden = true; }, 2200);
+              }}, "Salvar"),
+              h("button", {class:"btn", onclick: ev => testar(ev.currentTarget, CFG.chave, modelo.value)}, "Testar"),
+              salvo))
+        : h("div", {class:"stack-s"},
+            h("div", {class:"note warn"}, h("span", {}, "⚠️"),
+              h("span", {}, h("b", {}, "O servidor está sem chave. "),
+                "Enquanto isso, cole uma chave aqui para usar o app neste aparelho.")),
+            h("label", {for:"chave", style:"font-size:13.5px; font-weight:600"}, "Chave da API"),
+            chave,
+            h("p", {class:"lead", style:"font-size:12.5px"},
+              "Pegue a sua em ", h("a", {href:"https://aistudio.google.com/apikey", target:"_blank", rel:"noopener"}, "aistudio.google.com/apikey"), "."),
+            h("label", {for:"modelo", style:"font-size:13.5px; font-weight:600"}, "Modelo"),
+            modelo,
+            h("div", {class:"row"},
+              h("button", {class:"btn primary", onclick:() => {
+                CFG.chave = chave.value.trim(); CFG.modelo = modelo.value; gravarCfg();
+                salvo.hidden = false; setTimeout(() => { salvo.hidden = true; }, 2200);
+              }}, "Salvar"),
+              h("button", {class:"btn", onclick: ev => testar(ev.currentTarget, chave.value.trim(), modelo.value)}, "Testar conexão"),
+              salvo))),
 
     h("div", {class:"panel stack-s"},
       h("span", {class:"eyebrow"}, "Sua conta"),
