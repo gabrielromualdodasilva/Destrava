@@ -104,7 +104,7 @@
     .nav{left:0; right:auto; top:0; bottom:0; width:96px; flex-direction:column;
       justify-content:center; gap:6px; border-top:0; border-right:1px solid var(--line); padding:8px}
     .nav button{flex:0 0 auto; padding:12px 4px}
-    .shell{margin-left:96px}
+    body{padding-left:96px}
   }
 
   h2{font-family:var(--serif); font-size:25px; font-weight:600; letter-spacing:-.015em; margin:0; text-wrap:balance}
@@ -113,6 +113,21 @@
   .lead{color:var(--ink-2); margin:0; font-size:14.5px}
   .fig{font-family:var(--mono); font-size:13px; color:var(--accent); letter-spacing:-.02em}
   .en{font-family:var(--serif); font-size:19px; line-height:1.38}
+
+  /* Telas largas: a coluna cresce, mas o texto de leitura continua estreito —
+     linha longa demais cansa. So a trilha usa a largura inteira, em duas colunas. */
+  @media (min-width:1180px){
+    .shell{max-width:1060px}
+    #view > *{width:100%; max-width:770px; align-self:center}
+    #view > .mods, #view > .comLarissa{max-width:none}
+    .mods{display:grid; grid-template-columns:1fr 1fr; gap:4px 40px; align-items:start}
+    .mods .mod:nth-child(-n+2){margin-top:12px}
+  }
+
+  /* Larissa pequena, para acompanhar a licao sem roubar a cena */
+  .palco.mini{flex-direction:row; align-items:center; gap:12px; justify-content:flex-start}
+  .palco.mini .halo{width:76px; flex:0 0 auto}
+  .palco.mini .legenda{text-align:left; min-height:0}
 
   .stack{display:flex; flex-direction:column; gap:16px}
   .stack-s{display:flex; flex-direction:column; gap:9px}
@@ -235,10 +250,10 @@
   /* Personagem original, inspirada no estilo: cabelo escuro longo e ondulado,
      pele quente, sardinhas, blusa azul-acinzentada. Nao e retrato de ninguem. */
   :root{
-    --pele:#EBC3A3; --pele-b:#D6A47E; --cabelo:#2E1D14; --cabelo-b:#170D07;
-    --cabelo-luz:#6B452A;
-    --boca:#C2646A; --boca-i:#93414A; --blush:#E39C93; --iris:#4A3018;
-    --sarda:#C08A62; --blusa:#5A6B78;
+    --pele:#E9BE9B; --pele-c:#F3D4B6; --pele-s:#CE9B72;
+    --cabelo:#2B1A11; --cabelo-m:#462C1B; --cabelo-luz:#6E4527;
+    --boca:#C86F73; --boca-i:#8E3C45; --blush:#E08F86; --iris:#5A3A1E;
+    --sarda:#BC8055; --blusa:#5E7181; --blusa-c:#47596A;
   }
 
   .palco{
@@ -267,7 +282,7 @@
   @keyframes respira{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-2.5px) scale(1.008)}}
 
   /* cabeca acompanha o estado */
-  .lz-cabeca{transform-origin:100px 150px; transition:transform .45s cubic-bezier(.34,1.3,.5,1)}
+  .lz-cabeca{transform-origin:100px 145px; transition:transform .45s cubic-bezier(.34,1.3,.5,1)}
   .palco[data-larissa="ouvindo"] .lz-cabeca{transform:rotate(-6deg) translateY(-1px)}
   .palco[data-larissa="pensando"] .lz-cabeca{transform:rotate(4deg)}
   .palco[data-larissa="feliz"] .lz-cabeca{transform:translateY(-3px)}
@@ -850,13 +865,13 @@ const msgErro = e => e?.codigo === "cancelado" ? "" : (e?.message || "Algo falho
 
 const RecCls = window.SpeechRecognition || window.webkitSpeechRecognition;
 const TEM_MIC = !!RecCls;
-let rec = null, gravando = false;
+let rec = null, gravando = false, micPT = false;
 
 function ouvir({onParcial, onFim, onErro}){
   if(!TEM_MIC) return onErro?.("sem-suporte");
   try{ rec?.abort(); }catch(e){}
   rec = new RecCls();
-  rec.lang = L().locale; rec.interimResults = true; rec.continuous = false; rec.maxAlternatives = 1;
+  rec.lang = micPT ? "pt-BR" : L().locale; rec.interimResults = true; rec.continuous = false; rec.maxAlternatives = 1;
   let texto = "";
   rec.onresult = ev => {
     let t = "";
@@ -958,83 +973,134 @@ function alinhar(alvo, ouvido){
    fonetica de verdade, e ritmo, que e o que o olho le como fala. */
 
 const BOCAS = {
-  fechada: "M93 142 Q100 143 107 142 Q100 143 93 142",
-  leve:    "M89 141 Q100 147 111 141 Q100 145 89 141",
-  media:   "M87 140 Q100 152 113 140 Q100 147 87 140",
-  larga:   "M85 139 Q100 158 115 139 Q100 149 85 139",
-  o:       "M93 140 Q100 136 107 140 Q107 151 100 153 Q93 151 93 140",
-  sorriso: "M84 139 Q100 154 116 139 Q100 145 84 139",
+  fechada: "M95 131 Q100 132 105 131 Q100 132 95 131",
+  leve:    "M91 130 Q100 136 109 130 Q100 134 91 130",
+  media:   "M89 129 Q100 141 111 129 Q100 136 89 129",
+  larga:   "M87 128 Q100 147 113 128 Q100 138 87 128",
+  o:       "M95 129 Q100 125 105 129 Q105 140 100 142 Q95 140 95 129",
+  sorriso: "M87 129 Q100 143 113 129 Q100 135 87 129",
 };
 
 function avatarLarissa(){
   const svg = `
 <svg viewBox="0 0 200 200" role="img" aria-label="Larissa, sua professora">
   <defs>
-    <clipPath id="lzRosto"><ellipse cx="100" cy="112" rx="46" ry="52"/></clipPath>
+    <radialGradient id="lzPele" cx="50%" cy="34%" r="70%">
+      <stop offset="0%" stop-color="var(--pele-c)"/>
+      <stop offset="100%" stop-color="var(--pele)"/>
+    </radialGradient>
+    <radialGradient id="lzBlush">
+      <stop offset="0%" stop-color="var(--blush)" stop-opacity=".62"/>
+      <stop offset="70%" stop-color="var(--blush)" stop-opacity=".18"/>
+      <stop offset="100%" stop-color="var(--blush)" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="lzCabelo" x1="0" y1="0" x2="0.35" y2="1">
+      <stop offset="0%" stop-color="var(--cabelo)"/>
+      <stop offset="74%" stop-color="var(--cabelo)"/>
+      <stop offset="100%" stop-color="var(--cabelo-m)"/>
+    </linearGradient>
+    <linearGradient id="lzBlusa" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="var(--blusa-c)"/>
+      <stop offset="100%" stop-color="var(--blusa)"/>
+    </linearGradient>
+    <clipPath id="lzRosto">
+      <path d="M59 98 C59 64 76 49 100 49 C124 49 141 64 141 98
+               C141 123 126 148 100 150 C74 148 59 123 59 98 Z"/>
+    </clipPath>
   </defs>
+
   <g class="lz-corpo">
+    <!-- pescoco -->
+    <path d="M89 131 h22 v22 q-11 8 -22 0 z" fill="var(--pele-s)"/>
     <!-- ombros -->
-    <path d="M87 144 h26 v18 q-13 9 -26 0 z" fill="var(--pele-b)"/>
-    <path d="M26 200 Q30 158 74 148 L126 148 Q170 158 174 200 Z" fill="var(--blusa)"/>
+    <path d="M20 200 C24 162 40 145 62 139 L138 139 C160 145 176 162 180 200 Z" fill="url(#lzBlusa)"/>
+    <path d="M78 140 L122 140 C122 154 112 163 100 163 C88 163 78 154 78 140 Z" fill="var(--blusa-c)" opacity=".5"/>
+
     <g class="lz-cabeca">
-      <!-- cabelo: massa de tras, longa e ondulada ate abaixo dos ombros -->
-      <path d="M50 116 Q48 50 100 46 Q152 50 150 116 Q159 154 155 200 L122 200
-               Q130 158 136 116 Q138 88 100 86 Q62 88 64 116 Q70 158 78 200
-               L45 200 Q41 154 50 116 Z" fill="var(--cabelo)"/>
-      <path d="M144 124 Q150 162 145 198" stroke="var(--cabelo-luz)" stroke-width="4.5"
-            fill="none" opacity=".45" stroke-linecap="round"/>
-      <path d="M57 126 Q52 162 56 196" stroke="var(--cabelo-luz)" stroke-width="3.6"
-            fill="none" opacity=".38" stroke-linecap="round"/>
+      <!-- cabelo de tras, com onda nas pontas -->
+      <path d="M52 108 C48 60 72 40 100 40 C128 40 152 60 148 108
+               C152 132 149 150 156 174 C159 186 153 195 151 200
+               L119 200 C128 174 134 148 136 118
+               C138 90 122 76 100 76 C78 76 62 90 64 118
+               C66 148 72 174 81 200 L49 200
+               C47 195 41 186 44 174 C51 150 48 132 52 108 Z" fill="url(#lzCabelo)"/>
+
       <!-- orelhas -->
-      <ellipse cx="54" cy="114" rx="7" ry="10" fill="var(--pele-b)"/>
-      <ellipse cx="146" cy="114" rx="7" ry="10" fill="var(--pele-b)"/>
+      <ellipse cx="60" cy="102" rx="6" ry="9" fill="var(--pele-s)"/>
+      <ellipse cx="140" cy="102" rx="6" ry="9" fill="var(--pele-s)"/>
+
       <!-- rosto -->
-      <ellipse cx="100" cy="112" rx="46" ry="52" fill="var(--pele)"/>
-      <!-- franja -->
+      <path d="M59 98 C59 64 76 49 100 49 C124 49 141 64 141 98
+               C141 123 126 148 100 150 C74 148 59 123 59 98 Z" fill="url(#lzPele)"/>
+
+      <!-- franja repartida de lado -->
       <g clip-path="url(#lzRosto)">
-        <path d="M52 108 Q52 58 100 56 Q148 58 148 108 Q132 76 100 80 Q74 78 62 100 Q58 104 52 108 Z" fill="var(--cabelo)"/>
-        <path d="M100 56 Q122 60 132 84 Q116 70 96 72 Z" fill="var(--cabelo-b)" opacity=".55"/>
+        <path d="M57 104 C55 66 75 46 103 46 C113 46 119 50 122 55
+                 C110 59 90 66 76 82 C66 93 60 99 57 104 Z" fill="var(--cabelo)"/>
+        <path d="M122 55 C136 57 146 72 145 102 C141 80 133 68 119 62 Z" fill="var(--cabelo)"/>
+        <path d="M104 47 C92 52 78 62 68 78 C78 60 92 50 104 47 Z" fill="var(--cabelo-luz)" opacity=".4"/>
       </g>
-      <!-- sobrancelhas -->
-      <path class="lz-brow e" d="M70 96 Q80 90 90 95" stroke="var(--cabelo)" stroke-width="3.5" fill="none" stroke-linecap="round"/>
-      <path class="lz-brow d" d="M110 95 Q120 90 130 96" stroke="var(--cabelo)" stroke-width="3.5" fill="none" stroke-linecap="round"/>
-      <!-- olhos -->
+
+      <!-- sobrancelhas: finas, com ponta -->
+      <path class="lz-brow e" d="M71 87 C77 82 87 82 92 86" stroke="var(--cabelo)"
+            stroke-width="2.9" fill="none" stroke-linecap="round"/>
+      <path class="lz-brow d" d="M108 86 C113 82 123 82 129 87" stroke="var(--cabelo)"
+            stroke-width="2.9" fill="none" stroke-linecap="round"/>
+
+      <!-- olhos amendoados -->
       <g>
-        <ellipse cx="80" cy="110" rx="10.5" ry="7.5" fill="#fff"/>
-        <ellipse cx="120" cy="110" rx="10.5" ry="7.5" fill="#fff"/>
+        <path d="M70 100 C75 92 89 92 94 100 C89 107 75 107 70 100 Z" fill="#FDFBF8"/>
+        <path d="M106 100 C111 92 125 92 130 100 C125 107 111 107 106 100 Z" fill="#FDFBF8"/>
         <g class="lz-pupilas">
-          <circle cx="80" cy="110" r="5.4" fill="var(--iris)"/>
-          <circle cx="120" cy="110" r="5.4" fill="var(--iris)"/>
-          <circle cx="82" cy="108" r="1.9" fill="#fff" opacity=".9"/>
-          <circle cx="122" cy="108" r="1.9" fill="#fff" opacity=".9"/>
+          <circle cx="82" cy="100" r="4.8" fill="var(--iris)"/>
+          <circle cx="118" cy="100" r="4.8" fill="var(--iris)"/>
+          <circle cx="82" cy="100" r="2.1" fill="#180E06"/>
+          <circle cx="118" cy="100" r="2.1" fill="#180E06"/>
+          <circle cx="84" cy="98" r="1.5" fill="#fff" opacity=".92"/>
+          <circle cx="120" cy="98" r="1.5" fill="#fff" opacity=".92"/>
         </g>
-        <ellipse class="lz-palpebra a" cx="80" cy="110" rx="11" ry="8" fill="var(--pele)"/>
-        <ellipse class="lz-palpebra b" cx="120" cy="110" rx="11" ry="8" fill="var(--pele)"/>
+        <!-- linha de cilios -->
+        <path d="M70 100 C75 91 89 91 94 100" stroke="var(--cabelo)" stroke-width="2.4"
+              fill="none" stroke-linecap="round"/>
+        <path d="M106 100 C111 91 125 91 130 100" stroke="var(--cabelo)" stroke-width="2.4"
+              fill="none" stroke-linecap="round"/>
+        <path class="lz-palpebra a" d="M69 99 C74 90 90 90 95 99 C90 107 74 107 69 99 Z" fill="var(--pele)"/>
+        <path class="lz-palpebra b" d="M105 99 C110 90 126 90 131 99 C126 107 110 107 105 99 Z" fill="var(--pele)"/>
       </g>
+
       <!-- nariz -->
-      <path d="M100 116 q-4 10 2 12" stroke="var(--pele-b)" stroke-width="3" fill="none" stroke-linecap="round"/>
-      <!-- bochechas -->
-      <ellipse class="lz-blush" cx="70" cy="128" rx="9" ry="5.5" fill="var(--blush)"/>
-      <ellipse class="lz-blush" cx="130" cy="128" rx="9" ry="5.5" fill="var(--blush)"/>
-      <!-- sardinhas: espalhadas pelo nariz e macas do rosto -->
-      <g fill="var(--sarda)" opacity=".62">
-        <circle cx="88" cy="122" r="1.5"/><circle cx="94" cy="126" r="1.2"/>
-        <circle cx="83" cy="127" r="1.3"/><circle cx="91" cy="131" r="1.1"/>
-        <circle cx="76" cy="123" r="1.2"/><circle cx="71" cy="131" r="1.4"/>
-        <circle cx="79" cy="134" r="1.1"/><circle cx="100" cy="124" r="1.2"/>
-        <circle cx="106" cy="127" r="1.4"/><circle cx="112" cy="123" r="1.2"/>
-        <circle cx="109" cy="132" r="1.1"/><circle cx="118" cy="128" r="1.3"/>
-        <circle cx="124" cy="124" r="1.2"/><circle cx="128" cy="132" r="1.4"/>
-        <circle cx="121" cy="135" r="1.1"/>
+      <path d="M100 104 C97 112 96 116 99 118 C101 119 103 118 104 117"
+            stroke="var(--pele-s)" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+
+      <!-- bochechas difusas -->
+      <ellipse class="lz-blush" cx="74" cy="116" rx="13" ry="9" fill="url(#lzBlush)"/>
+      <ellipse class="lz-blush" cx="126" cy="116" rx="13" ry="9" fill="url(#lzBlush)"/>
+
+      <!-- sardinhas: densas no nariz, rareando para as maças -->
+      <g fill="var(--sarda)">
+        <circle cx="94" cy="110" r="1.05" opacity=".72"/><circle cx="100" cy="113" r="1.15" opacity=".78"/>
+        <circle cx="106" cy="110" r="1.05" opacity=".72"/><circle cx="97" cy="116" r=".95" opacity=".66"/>
+        <circle cx="104" cy="116" r=".95" opacity=".66"/>
+        <circle cx="86" cy="112" r="1.1" opacity=".6"/><circle cx="80" cy="115" r="1.2" opacity=".62"/>
+        <circle cx="74" cy="112" r="1.05" opacity=".5"/><circle cx="77" cy="120" r="1" opacity=".5"/>
+        <circle cx="84" cy="120" r=".9" opacity=".46"/><circle cx="70" cy="118" r=".95" opacity=".4"/>
+        <circle cx="114" cy="112" r="1.1" opacity=".6"/><circle cx="120" cy="115" r="1.2" opacity=".62"/>
+        <circle cx="126" cy="112" r="1.05" opacity=".5"/><circle cx="123" cy="120" r="1" opacity=".5"/>
+        <circle cx="116" cy="120" r=".9" opacity=".46"/><circle cx="130" cy="118" r=".95" opacity=".4"/>
       </g>
-      <!-- boca -->
-      <path d="M86 137 Q100 132 114 137 Q100 149 86 137" fill="var(--boca)"/>
+
+      <!-- labios com arco do cupido -->
+      <path d="M86 128 C89 123 94 124 100 127 C106 124 111 123 114 128
+               C110 138 104 141 100 141 C96 141 90 138 86 128 Z" fill="var(--boca)"/>
+      <path d="M86 128 C90 126 95 127 100 128 C105 127 110 126 114 128"
+            stroke="var(--boca-i)" stroke-width="1" fill="none" opacity=".55"/>
       <path id="lzBoca" class="lz-boca" d="${BOCAS.fechada}" fill="var(--boca-i)"/>
+
       <!-- pensando -->
       <g class="lz-pensa">
-        <circle cx="158" cy="72" r="3.4" fill="var(--accent)"/>
-        <circle cx="168" cy="66" r="4.2" fill="var(--accent)"/>
-        <circle cx="180" cy="58" r="5" fill="var(--accent)"/>
+        <circle cx="156" cy="66" r="3.2" fill="var(--accent)"/>
+        <circle cx="167" cy="59" r="4" fill="var(--accent)"/>
+        <circle cx="180" cy="50" r="4.8" fill="var(--accent)"/>
       </g>
     </g>
   </g>
@@ -1054,7 +1120,9 @@ const Larissa = {
     const t = {parada:"", falando:"falando…", ouvindo:"ouvindo você", pensando:"pensando…", feliz:"muito bem!"}[this.estado] || "";
     for(const p of this.palcos){
       const l = p?.querySelector(".legenda");
-      if(l) l.textContent = t;
+      if(!l) continue;
+      if(this.estado === "parada" && p.classList.contains("mini")) l.textContent = l.dataset.repouso || "";
+      else l.textContent = t;
     }
   },
 
@@ -1093,8 +1161,11 @@ const Larissa = {
   comemora(){ this.vai("feliz"); },
 };
 
-function palco(){
-  const el = h("div", {class:"palco"}, avatarLarissa(), h("div", {class:"legenda"}, ""));
+function palco(mini){
+  const el = h("div", {class:"palco" + (mini ? " mini" : "")},
+    avatarLarissa(),
+    h("div", {class:"legenda", "data-repouso": mini ? "Larissa preparou esta lição" : ""},
+      mini ? "Larissa preparou esta lição" : ""));
   Larissa.registrar(el);
   return el;
 }
@@ -1227,7 +1298,7 @@ function verTrilha(){
       }));
   });
 
-  pintar(hero, ...mods);
+  pintar(hero, h("div", {class:"mods"}, ...mods));
 }
 
 /* ---------- Lição ----------
@@ -1268,7 +1339,9 @@ async function verLicao(id, refazer){
 
   if(!refazer && cacheLicao[id]) return montarLicao(l, cabeca, cacheLicao[id]);
 
-  pintar(cabeca, h("div", {class:"panel", style:"display:flex; gap:10px; align-items:center"},
+  const espera = palco(true);
+  Larissa.pensa(true);
+  pintar(cabeca, espera, h("div", {class:"panel", style:"display:flex; gap:10px; align-items:center"},
     h("span", {class:"spin"}), h("span", {class:"lead"}, "Larissa está preparando sua aula…")));
 
   const sistema =
@@ -1297,8 +1370,10 @@ Use 3 pontos, 5 exemplos e exatamente 5 exercícios misturando os dois tipos. Em
     const d = await pedirJSON({prompt, sistema});
     if(!d || !Array.isArray(d.exercicios) || !d.exercicios.length) throw new ErroIA("json", "A aula veio incompleta. Toque de novo.");
     guardarAula(id, d);
+    Larissa.pensa(false);
     if(licaoAberta === id) montarLicao(l, cabeca, d);
   }catch(e){
+    Larissa.pensa(false);
     if(e?.codigo === "cancelado") return;
     pintar(cabeca, h("div", {class:"panel stack-s"},
       h("p", {class:"lead"}, msgErro(e)),
@@ -1342,7 +1417,7 @@ function montarLicao(l, cabeca, d){
           if(bi === certa) b.classList.add("right");
           else if(bi === oi) b.classList.add("wrong");
         });
-        if(!resp[i]) anotarErro(q.opcoes[oi], q.opcoes[certa], q.porque);
+        if(resp[i]) Larissa.comemora(); else anotarErro(q.opcoes[oi], q.opcoes[certa], q.porque);
         bloco.append(h("div", {class:"why"}, q.porque || ""));
         conferir();
       }}, o));
@@ -1394,7 +1469,7 @@ function montarLicao(l, cabeca, d){
     onclick:() => { delete cacheLicao[l.id]; verLicao(l.id, true); }}, "↻ Gerar outra versão desta aula");
 
   const feita = S.feitas[l.id];
-  pintar(cabeca, teoria, exemplos, refazerBtn,
+  pintar(cabeca, palco(true), teoria, exemplos, refazerBtn,
     feita ? h("div", {class:"note"}, h("span", {}, "✓"),
       h("span", {}, `Você já fez esta lição e acertou ${feita.acertos} de ${feita.total}. Refazer não tira pontos.`)) : null,
     h("span", {class:"eyebrow"}, "Agora pratique"), exArea, fim);
@@ -1428,13 +1503,20 @@ let ctl = null;
 
 const SISTEMA_CHAT = () => {
   const n = Object.keys(S.feitas).length;
-  const nivel = n < 8 ? "bem iniciante, sabe pouquíssimo inglês" : n < 20 ? "iniciante" : n < 34 ? "intermediário baixo" : "intermediário";
-  return `Você é Larissa, uma professora de ${L().adj} brasileira conversando por voz com um aluno de nível ${nivel}. Você é calorosa, paciente e breve.
+  const nivel = n < 8 ? `bem iniciante, sabe pouquíssimo ${L().adj}` : n < 20 ? "iniciante" : n < 34 ? "intermediário baixo" : "intermediário";
+  return `Você é Larissa, uma professora de ${L().adj} brasileira conversando com um aluno de nível ${nivel}. Você é calorosa, paciente e breve.
+
+O aluno pode escrever em ${L().adj} OU em português, e os dois são bem-vindos:
+- Se ele escrever em ${L().adj}: responda em ${L().adj} e corrija os erros dele.
+- Se ele escrever em português — uma dúvida, um pedido de ajuda, algo que ele não sabe dizer — responda a dúvida dele em português na linha PT, e use a linha EN para mostrar como aquilo se diz em ${L().adj}. Nesse caso FIX é exatamente ok.
+- NUNCA trate português como ${L().adj} errado. Escrever em português não é erro.
+
 Responda SEMPRE exatamente neste formato, quatro linhas, nada fora dele:
-EN: <sua resposta em ${L().adj}, 1 a 2 frases curtas, no nível do aluno, terminando com uma pergunta>
-PT: <tradução curta da linha EN>
-FIX: <se a última mensagem do aluno tiver erro de ${L().adj}, escreva só a frase dele corrigida; se não tiver erro, escreva exatamente ok>
+EN: <frase em ${L().adj}, 1 a 2 frases curtas, no nível do aluno, terminando com uma pergunta>
+PT: <tradução da linha EN; ou, se ele escreveu em português, a resposta à dúvida dele>
+FIX: <se ele tentou ${L().adj} e errou, só a frase dele corrigida; caso contrário, exatamente ok>
 TIP: <se houver correção, uma linha em português explicando o erro; se não houver, deixe vazio>
+
 Nunca escreva parágrafos longos. Nunca saia do formato. Nunca use asteriscos nem markdown.`;
 };
 
@@ -1502,8 +1584,8 @@ function painelConversa(){
 
   if(turnos.length === 0){
     lista.append(h("div", {class:"empty"},
-      `Diga qualquer coisa em ${L().adj} — nem que seja `, h("i", {}, L().oi), ".",
-      h("br"), "Larissa responde, corrige e pergunta de volta."));
+      `Fale em ${L().adj} — nem que seja `, h("i", {}, L().oi), ` — ou pergunte em português.`,
+      h("br"), "Larissa corrige o que você tentou e explica o que você não sabe."));
   } else {
     for(const t of turnos){
       if(t.role === "user") bolha("me", t.content);
@@ -1516,8 +1598,18 @@ function painelConversa(){
     h("span", {}, h("b", {}, "Sem reconhecimento de voz neste navegador. "),
       "Dá para escrever normalmente, e a Larissa continua falando com você. Para falar, use o Chrome — no Safari do iPhone o reconhecimento não é confiável.")));
 
+  const escolhaMic = TEM_MIC
+    ? h("div", {class:"row", style:"justify-content:flex-end; gap:6px; margin-top:12px"},
+        h("span", {style:"font-size:12px; color:var(--ink-3)"}, "Microfone ouve:"),
+        h("div", {class:"seg", style:"flex:0 0 auto; width:auto"},
+          h("button", {"aria-pressed": !micPT, style:"padding:5px 12px; font-size:12.5px",
+            onclick:() => { micPT = false; rotear(); }}, L().nome),
+          h("button", {"aria-pressed": micPT, style:"padding:5px 12px; font-size:12.5px",
+            onclick:() => { micPT = true; rotear(); }}, "Português")))
+    : null;
+
   return h("div", {class:"stack"}, ...avisos,
-    h("div", {class:"panel lift"}, lista, h("div", {class:"composer"}, campo, TEM_MIC ? micBtn : null, enviarBtn)),
+    h("div", {class:"panel lift"}, lista, h("div", {class:"composer"}, campo, TEM_MIC ? micBtn : null, enviarBtn), escolhaMic),
     turnos.length ? h("button", {class:"btn ghost sm", style:"align-self:center",
       onclick:() => { turnos = []; rotear(); }}, "Limpar conversa") : null);
 }
