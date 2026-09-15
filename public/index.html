@@ -137,6 +137,8 @@
     text-align:left; color:inherit; transition:border-color .2s ease, transform .2s ease;
   }
   .cartao:hover{border-color:var(--accent); transform:translateY(-2px)}
+  .cartao.atual{border-color:var(--accent); cursor:default}
+  .cartao.atual:hover{transform:none}
   .cartao .sigla{
     font-family:var(--mono); font-size:12px; font-weight:600; letter-spacing:.1em;
     color:var(--accent); background:var(--accent-soft); padding:3px 9px; border-radius:999px;
@@ -1306,8 +1308,8 @@ function pintarTopo(){
   const bt = $("idioma");
   if(bt){
     bt.textContent = L().bandeira;
-    bt.title = `Estudando ${L().nome}. Toque para trocar de idioma.`;
-    bt.onclick = () => verEscolha(true);
+    bt.title = `Estudando ${L().nome}. Toque para ver seus perfis.`;
+    bt.onclick = () => { aba = "prog"; licaoAberta = null; rotear(); };
   }
   const n = S.streak.n || 0;
   $("streak").textContent = n === 1 ? "1 dia" : n + " dias";
@@ -1716,18 +1718,8 @@ function painelConversa(){
     h("span", {}, h("b", {}, "Sem reconhecimento de voz neste navegador. "),
       "Dá para escrever normalmente, e a Larissa continua falando com você. Para falar, use o Chrome — no Safari do iPhone o reconhecimento não é confiável.")));
 
-  const escolhaMic = TEM_MIC
-    ? h("div", {class:"row", style:"justify-content:flex-end; gap:6px; margin-top:12px"},
-        h("span", {style:"font-size:12px; color:var(--ink-3)"}, "Microfone ouve:"),
-        h("div", {class:"seg", style:"flex:0 0 auto; width:auto"},
-          h("button", {"aria-pressed": !micPT, style:"padding:5px 12px; font-size:12.5px",
-            onclick:() => { micPT = false; rotear(); }}, L().nome),
-          h("button", {"aria-pressed": micPT, style:"padding:5px 12px; font-size:12.5px",
-            onclick:() => { micPT = true; rotear(); }}, "Português")))
-    : null;
-
   return h("div", {class:"stack"}, ...avisos,
-    h("div", {class:"panel lift"}, lista, h("div", {class:"composer"}, campo, TEM_MIC ? micBtn : null, enviarBtn), escolhaMic),
+    h("div", {class:"panel lift"}, lista, h("div", {class:"composer"}, campo, TEM_MIC ? micBtn : null, enviarBtn)),
     turnos.length ? h("button", {class:"btn ghost sm", style:"align-self:center",
       onclick:() => { turnos = []; rotear(); }}, "Limpar conversa") : null);
 }
@@ -1858,6 +1850,27 @@ Explique o que provavelmente saiu errado na pronúncia dessas palavras e como co
 
 /* ---------- Progresso ---------- */
 
+function painelPerfis(){
+  const cartao = k => {
+    const d = IDIOMAS[k], feitas = progressoDe(k), tot = d.licoes.length, atual = k === IDIOMA;
+    return h("button", {class:"cartao" + (atual ? " atual" : ""), disabled: atual || null,
+      onclick:() => { if(!atual) definirIdioma(k); }},
+      h("div", {class:"row", style:"width:100%; justify-content:space-between"},
+        h("span", {class:"sigla"}, d.bandeira),
+        atual ? h("span", {class:"chip", style:"background:var(--good-soft); color:var(--good); border-color:transparent"}, "estudando agora") : null),
+      h("span", {class:"nome"}, d.nome),
+      h("span", {class:"info"}, `${feitas} de ${tot} lições`),
+      h("div", {class:"bar"}, h("i", {style:`width:${Math.round(100*feitas/tot)}%`})),
+      atual ? null : h("span", {class:"info", style:"color:var(--accent); font-weight:600"},
+        feitas ? "Voltar de onde parei ›" : "Começar este ›"));
+  };
+  return h("div", {class:"stack-s"},
+    h("span", {class:"eyebrow"}, "Seus perfis"),
+    h("div", {class:"escolha"}, cartao("en"), cartao("it")),
+    h("p", {class:"lead", style:"font-size:12.5px"},
+      "Cada idioma guarda a própria trilha, os próprios erros e o próprio streak. Trocar aqui não perde nada."));
+}
+
 function verProgresso(){
   const feitas = Object.keys(S.feitas).length;
   const faladas = Object.keys(S.falados).length;
@@ -1889,6 +1902,8 @@ function verProgresso(){
 
   pintar(
     h("h2", {}, "Seu progresso"),
+    painelPerfis(),
+    h("span", {class:"eyebrow"}, `Em ${L().nome.toLowerCase()}`),
     tiles,
     h("div", {class:"panel stack-s"}, h("span", {class:"eyebrow"}, "Por módulo"), ...porMod),
     h("div", {class:"row", style:"justify-content:space-between"},
@@ -1978,6 +1993,13 @@ function verAjustes(){
         CFG.voz = voz.value; CFG.taxa = Number(taxa.value); gravarCfg();
         falar(L().saudacao, CFG.taxa);
       }}, "🔊 Testar esta voz"),
+      TEM_MIC ? h("div", {class:"stack-s", style:"gap:6px; margin-top:4px"},
+        h("span", {style:"font-size:13.5px; font-weight:600"}, "O microfone ouve em"),
+        h("div", {class:"seg", style:"max-width:300px"},
+          h("button", {"aria-pressed": !micPT, onclick:() => { micPT = false; rotear(); }}, L().nome),
+          h("button", {"aria-pressed": micPT, onclick:() => { micPT = true; rotear(); }}, "Português")),
+        h("p", {class:"lead", style:"font-size:12.5px"},
+          `Deixe em ${L().nome} para treinar. Mude para português só quando quiser fazer uma pergunta falando.`)) : null,
       h("p", {class:"lead", style:"font-size:12.5px"},
         "As vozes disponíveis vêm do seu aparelho, não do app. No Chrome do Android as melhores costumam ser as do Google; no iPhone, Samantha.")),
 
