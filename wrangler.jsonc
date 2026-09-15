@@ -3,6 +3,8 @@
   // a chave do Gemini a partir do segredo GEMINI_KEY. Sem build.
   "name": "destravaingles",
   "main": "src/worker.js",
+  // Publica na rota <worker>.<conta>.workers.dev
+  "workers_dev": true,
   "compatibility_date": "2026-09-01",
   "assets": {
     "directory": "./public",
