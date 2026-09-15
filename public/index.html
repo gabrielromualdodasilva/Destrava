@@ -178,6 +178,15 @@
   @keyframes pulinho{0%,100%{transform:translateY(0)}38%{transform:translateY(-9px)}}
   @media (prefers-reduced-motion: reduce){ .palco[data-larissa="feliz"] .halo{animation:none} }
 
+  .avisoCota{
+    position:fixed; left:50%; transform:translateX(-50%);
+    bottom:calc(84px + env(safe-area-inset-bottom, 0px)); z-index:60;
+    max-width:min(94vw, 460px); background:var(--signal-soft); color:var(--ink);
+    border-radius:12px; padding:12px 14px; font-size:13.5px; line-height:1.45;
+    box-shadow:var(--shadow); display:flex; flex-wrap:wrap; gap:6px; align-items:center;
+  }
+  @media (min-width:900px){ .avisoCota{bottom:24px} }
+
   .vozes{display:flex; flex-wrap:wrap; gap:7px}
   .vozbt{
     border:1.5px solid var(--line); background:var(--surface); color:var(--ink-2);
@@ -1045,8 +1054,45 @@ function palmas(n){
 const MODELO_TTS = "gemini-3.1-flash-tts-preview";
 const VOZES_IA = ["Kore", "Leda", "Aoede", "Callirrhoe", "Autonoe", "Despina", "Sulafat", "Zephyr"];
 
-const cacheVoz = new Map();   // texto -> URL do audio, so nesta sessao
+const cacheVoz = new Map();   // texto -> URL, nesta sessao
 let tocando = null;
+let semCotaHoje = false;      // o Gemini ja recusou hoje: nao insiste
+
+/* Cofre de audio no proprio navegador. Importa porque o plano gratuito da
+   apenas 10 geracoes de voz por dia: o que foi gerado uma vez nunca mais
+   precisa ser gerado. As frases fixas — as dicas da Larissa — acabam
+   guardadas de vez, e passam a tocar na hora, de graca, para sempre. */
+const VOZ_DB = "destrava-voz";
+let bancoVoz = null;
+
+function abrirBancoVoz(){
+  if(bancoVoz) return bancoVoz;
+  bancoVoz = new Promise(res => {
+    try{
+      const req = indexedDB.open(VOZ_DB, 1);
+      req.onupgradeneeded = () => { req.result.createObjectStore("audios"); };
+      req.onsuccess = () => res(req.result);
+      req.onerror = () => res(null);
+    }catch(e){ res(null); }
+  });
+  return bancoVoz;
+}
+
+async function doCofre(chave){
+  const db = await abrirBancoVoz(); if(!db) return null;
+  return new Promise(res => {
+    try{
+      const p = db.transaction("audios", "readonly").objectStore("audios").get(chave);
+      p.onsuccess = () => res(p.result || null);
+      p.onerror = () => res(null);
+    }catch(e){ res(null); }
+  });
+}
+
+async function paraCofre(chave, blob){
+  const db = await abrirBancoVoz(); if(!db) return;
+  try{ db.transaction("audios", "readwrite").objectStore("audios").put(blob, chave); }catch(e){}
+}
 
 /* O Gemini devolve PCM cru; o navegador toca WAV. Sao 44 bytes de cabecalho. */
 function pcmParaWav(pcm, taxa){
@@ -1063,6 +1109,7 @@ function pcmParaWav(pcm, taxa){
 }
 
 async function gerarVoz(texto){
+  if(semCotaHoje) return null;
   const r = await fetch(`${PROXY}/api/gemini/${MODELO_TTS}:generateContent`, {
     method:"POST", headers:{"Content-Type":"application/json"},
     body: JSON.stringify({
@@ -1073,27 +1120,49 @@ async function gerarVoz(texto){
       },
     }),
   });
-  if(!r.ok) return null;
   const d = await r.json().catch(() => null);
+  if(!r.ok){
+    const m = String(d?.error?.message || "");
+    if(r.status === 429 || /quota/i.test(m)){
+      semCotaHoje = true;
+      avisarCota();
+    }
+    return null;
+  }
   const parte = ((d?.candidates?.[0]?.content?.parts) || []).find(p => p.inlineData);
   if(!parte) return null;
   const bruto = atob(parte.inlineData.data);
   const bytes = new Uint8Array(bruto.length);
   for(let i = 0; i < bruto.length; i++) bytes[i] = bruto.charCodeAt(i);
   const taxa = Number((String(parte.inlineData.mimeType).match(/rate=(\d+)/) || [])[1]) || 24000;
-  return URL.createObjectURL(pcmParaWav(bytes.buffer, taxa));
+  return pcmParaWav(bytes.buffer, taxa);
+}
+
+/* Trocar de voz sem avisar e pior que nao trocar: a pessoa acha que o
+   seletor quebrou. Entao a troca aparece, uma vez por sessao. */
+let cotaAvisada = false;
+function avisarCota(){
+  if(cotaAvisada) return;
+  cotaAvisada = true;
+  const t = h("div", {class:"avisoCota"},
+    h("b", {}, "A voz natural acabou por hoje. "),
+    "O plano gratuito do Gemini dá 10 gerações por dia. Seguindo com a voz do aparelho — as frases que a Larissa já disse antes continuam com a voz boa.",
+    h("button", {class:"btn ghost sm", onclick: ev => ev.target.parentElement.remove()}, "ok"));
+  document.body.append(t);
+  setTimeout(() => { try{ t.remove(); }catch(e){} }, 12000);
 }
 
 /* Gerar voz leva alguns segundos. Se a frase ja esta prevista — a dica da
    trilha, por exemplo — da para preparar em silencio enquanto a pessoa le,
    e o clique fica instantaneo. */
 async function aquecerVoz(texto){
-  if(!SERVIDOR || CFG.natural === false || !texto) return;
+  if(!SERVIDOR || CFG.natural === false || !texto || semCotaHoje) return;
   const chave = (CFG.vozIA || "Kore") + "|" + texto;
   if(cacheVoz.has(chave)) return;
   try{
-    const url = await gerarVoz(texto);
-    if(url) cacheVoz.set(chave, url);
+    let blob = await doCofre(chave);
+    if(!blob){ blob = await gerarVoz(texto); if(blob) paraCofre(chave, blob); }
+    if(blob) cacheVoz.set(chave, URL.createObjectURL(blob));
   }catch(e){}
 }
 
@@ -1114,12 +1183,18 @@ async function dizer(texto, reserva){
   const chave = (CFG.vozIA || "Kore") + "|" + texto;
   let url = cacheVoz.get(chave);
   if(!url){
-    const antes = Larissa.estado;
-    if(antes === "parada") Larissa.pensa(true);
-    try{ url = await gerarVoz(texto); }catch(e){ url = null; }
-    if(Larissa.estado === "pensando") Larissa.vai(antes);
-    if(!url) return reserva();                    // sem cota ou sem rede
-    if(cacheVoz.size > 40){                       // nao guarda a sessao inteira
+    let blob = await doCofre(chave);              // ja guardado de outro dia?
+    if(!blob){
+      if(semCotaHoje) return reserva();
+      const antes = Larissa.estado;
+      if(antes === "parada") Larissa.pensa(true);
+      try{ blob = await gerarVoz(texto); }catch(e){ blob = null; }
+      if(Larissa.estado === "pensando") Larissa.vai(antes);
+      if(!blob) return reserva();                 // sem cota ou sem rede
+      paraCofre(chave, blob);                     // nunca mais gera esta frase
+    }
+    url = URL.createObjectURL(blob);
+    if(cacheVoz.size > 40){
       const velha = cacheVoz.keys().next().value;
       try{ URL.revokeObjectURL(cacheVoz.get(velha)); }catch(e){}
       cacheVoz.delete(velha);
@@ -2207,7 +2282,7 @@ function verAjustes(){
       }}, "🔊 Testar a voz do aparelho"),
       h("div", {class:"note"}, h("span", {}, "🎙️"),
         h("span", {}, h("b", {}, "Voz natural do Gemini. "),
-          "A mesma voz nos dois idiomas, bem mais natural que a do aparelho. Leva alguns segundos na primeira vez que ouve cada frase; depois é instantâneo.")),
+          "A mesma voz nos dois idiomas, bem mais natural que a do aparelho — mas limitada a 10 frases novas por dia no plano gratuito.")),
       h("div", {class:"seg", style:"max-width:340px"},
         h("button", {"aria-pressed": CFG.natural !== false,
           onclick:() => { CFG.natural = true; gravarCfg(); rotear(); }}, "Voz natural"),
@@ -2228,8 +2303,9 @@ function verAjustes(){
                   try{ await falarPT("Oi! Sou a Larissa. Vamos estudar juntos hoje?"); }catch(e){}
                   b.disabled = false; b.textContent = antes;
                 }}, v))),
-            h("p", {class:"lead", style:"font-size:12.5px"},
-              "A primeira vez que ela diz uma frase leva alguns segundos para gerar; depois aquela frase toca na hora."))
+            h("div", {class:"note warn"}, h("span", {}, "⏳"),
+              h("span", {}, h("b", {}, "10 por dia. "),
+                "O plano gratuito do Gemini gera 10 áudios por dia. Cada frase gerada fica guardada neste aparelho para sempre, então as falas que se repetem — as dicas dela — logo passam a tocar na hora e sem gastar cota. Passando de 10, ela usa a voz do aparelho até o dia seguinte.")))
         : null,
 
       h("span", {class:"eyebrow", style:"margin-top:8px"}, "Reserva: voz do aparelho"),
