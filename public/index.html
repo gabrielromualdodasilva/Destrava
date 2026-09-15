@@ -250,6 +250,7 @@
 
 <script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore-compat.js"></script>
 <script>
 "use strict";
 
@@ -269,7 +270,7 @@ const FB = {
   "version": "2"
 };
 
-let AUTH = null, UID = null, EMAIL = null;
+let AUTH = null, NUVEM = null, UID = null, EMAIL = null;
 
 const ERRO_AUTH = {
   "auth/invalid-email": "E-mail inválido.",
@@ -426,10 +427,38 @@ function ler(chave, padrao, alternativas){
   }
   return padrao();
 }
+let adiado = null, fila = Promise.resolve();
+
 function gravar(){
   S.em = Date.now();
   try{ localStorage.setItem(LS, JSON.stringify(S)); }catch(e){}
   pintarTopo();
+
+  // O aparelho e a verdade imediata; a nuvem recebe a copia pouco depois,
+  // para o progresso seguir a pessoa de um aparelho para outro.
+  if(!NUVEM || !UID || UID === "local") return;
+  clearTimeout(adiado);
+  adiado = setTimeout(() => {
+    const copia = JSON.parse(JSON.stringify(S));
+    copia.email = EMAIL;
+    copia.visto = new Date().toISOString();
+    copia.licoesFeitas = Object.keys(S.feitas).length;
+    fila = fila.then(() => NUVEM.collection("usuarios").doc(UID).set(copia)).catch(() => {});
+  }, 900);
+}
+
+async function puxarDaNuvem(){
+  if(!NUVEM || !UID || UID === "local") return;
+  try{
+    const snap = await NUVEM.collection("usuarios").doc(UID).get();
+    if(!snap.exists) return;
+    const r = snap.data();
+    if(r && typeof r.em === "number" && r.em > (S.em || 0)){
+      S = Object.assign(NOVO(), r);
+      try{ localStorage.setItem(LS, JSON.stringify(S)); }catch(e){}
+      pintarTopo(); rotear();
+    }
+  }catch(e){}   // offline ou regra negando: o aparelho continua valendo
 }
 function gravarCfg(){ try{ localStorage.setItem(LS_CFG, JSON.stringify(CFG)); }catch(e){} }
 
@@ -1532,6 +1561,7 @@ function entrarNoApp(uid, email){
   aba = "trilha"; licaoAberta = null; turnos = [];
   pintarTopo();
   rotear();
+  puxarDaNuvem();
   sondarServidor().then(() => { if(SERVIDOR) rotear(); });
 }
 
@@ -1561,6 +1591,7 @@ function iniciarAuth(){
   try{
     firebase.initializeApp(FB);
     AUTH = firebase.auth();
+    try{ NUVEM = firebase.firestore(); }catch(e){ NUVEM = null; }
     AUTH.onAuthStateChanged(async u => {
       if(u) return entrarNoApp(u.uid, u.email);
       verLogin(undefined, !(await loginAtivado()));
