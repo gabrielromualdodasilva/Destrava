@@ -12,13 +12,10 @@ const GEMINI = "https://generativelanguage.googleapis.com/v1beta/models";
 // Quem pode chamar. Qualquer outro site recebe a resposta sem o cabecalho
 // de liberacao, e o navegador dele bloqueia a leitura.
 const ORIGENS = new Set([
-  "https://destravaingles.pages.dev",        // Cloudflare Pages
-  "https://destrava-ingles.web.app",         // Firebase Hosting
-  "https://destrava-ingles.firebaseapp.com",
-  "https://destravaingles.web.app",          // Firebase Hosting
-  "https://destravaingles.firebaseapp.com",
+  "https://destravaapp.web.app",          // Firebase Hosting (conta pessoal)
+  "https://destravaapp.firebaseapp.com",
+  "https://destravaingles.pages.dev",     // Cloudflare Pages, caso mude de ideia
   "https://destrava.pages.dev",
-  "https://destrava.web.app",
 ]);
 
 // So estes dois metodos, e so nomes de modelo plausiveis: o caminho vem do
