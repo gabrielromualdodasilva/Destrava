@@ -689,7 +689,7 @@ const NOVO = () => ({
   feitas:{}, xp:0, streak:{n:0, dia:null}, erros:[], falados:{}, v:1, em:0,
 });
 const CFG_NOVO = () => ({chave:"", modelo:"gemini-flash-lite-latest", voz:"", vozPT:"",
-  taxa:0.92, vozIA:"Kore", natural:true});
+  taxa:0.92, vozIA:"Kore", vozAzure:"", natural:true});
 
 let S = NOVO(), CFG = CFG_NOVO();
 let LS = "destrava.estado.v1", LS_CFG = "destrava.cfg.v1";
@@ -764,6 +764,7 @@ const API_DIRETA = "https://generativelanguage.googleapis.com/v1beta/models";
    com /api/gemini/... no proprio dominio. Aberto como arquivo local, cai no
    modo antigo: a chave do proprio aparelho, direto no Google. */
 let SERVIDOR = false;
+let AZURE = false;   // Azure Speech configurado no servidor
 
 /* Onde fica a portinha da API que guarda a chave. Se a propria pagina for
    servida pelo Worker, caminho relativo; no Firebase, o endereco absoluto
@@ -785,6 +786,7 @@ async function sondarServidor(){
     if(!r.ok) return;
     const d = await r.json();
     SERVIDOR = !!(d && d.chave);
+    AZURE = !!(d && d.azure);
   }catch(e){}   // arquivo local, ou offline: segue no modo chave-no-aparelho
 }
 /* Apelidos "-latest": o Google os mantem apontando para a versao atual,
@@ -1108,6 +1110,32 @@ function pcmParaWav(pcm, taxa){
   return new Blob([buf], {type:"audio/wav"});
 }
 
+const VOZ_AZ_PADRAO = "pt-BR-FranciscaNeural";
+let vozesAzure = null;   // carregadas do servidor na primeira vez que Ajustes abre
+
+async function listarVozesAzure(){
+  if(vozesAzure) return vozesAzure;
+  try{
+    const r = await fetch(`${PROXY}/api/vozes`);
+    vozesAzure = r.ok ? await r.json() : [];
+  }catch(e){ vozesAzure = []; }
+  return vozesAzure;
+}
+
+/* O Azure devolve MP3 pronto — nada de montar cabecalho. E sao 500 mil
+   caracteres por mes de graca, entao nao e preciso racionar. */
+async function gerarVozAzure(texto, voz){
+  try{
+    const r = await fetch(`${PROXY}/api/voz`, {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({texto, voz}),
+    });
+    if(!r.ok) return null;
+    const b = await r.blob();
+    return b && b.size > 400 ? b : null;
+  }catch(e){ return null; }
+}
+
 async function gerarVoz(texto){
   if(semCotaHoje) return null;
   const r = await fetch(`${PROXY}/api/gemini/${MODELO_TTS}:generateContent`, {
@@ -1156,12 +1184,18 @@ function avisarCota(){
    trilha, por exemplo — da para preparar em silencio enquanto a pessoa le,
    e o clique fica instantaneo. */
 async function aquecerVoz(texto){
-  if(!SERVIDOR || CFG.natural === false || !texto || semCotaHoje) return;
-  const chave = (CFG.vozIA || "Kore") + "|" + texto;
+  if(!SERVIDOR || CFG.natural === false || !texto) return;
+  if(!AZURE && semCotaHoje) return;
+  const motor = AZURE ? "az" : "gem";
+  const vozAtual = AZURE ? (CFG.vozAzure || VOZ_AZ_PADRAO) : (CFG.vozIA || "Kore");
+  const chave = motor + "|" + vozAtual + "|" + texto;
   if(cacheVoz.has(chave)) return;
   try{
     let blob = await doCofre(chave);
-    if(!blob){ blob = await gerarVoz(texto); if(blob) paraCofre(chave, blob); }
+    if(!blob){
+      blob = AZURE ? await gerarVozAzure(texto, vozAtual) : await gerarVoz(texto);
+      if(blob) paraCofre(chave, blob);
+    }
     if(blob) cacheVoz.set(chave, URL.createObjectURL(blob));
   }catch(e){}
 }
@@ -1180,15 +1214,21 @@ async function dizer(texto, reserva){
   pararVoz();
   if(!SERVIDOR || CFG.natural === false) return reserva();
 
-  const chave = (CFG.vozIA || "Kore") + "|" + texto;
+  // Azure primeiro: 500 mil caracteres por mes contra 10 audios por dia.
+  const motor = AZURE ? "az" : "gem";
+  const vozAtual = AZURE ? (CFG.vozAzure || VOZ_AZ_PADRAO) : (CFG.vozIA || "Kore");
+  const chave = motor + "|" + vozAtual + "|" + texto;
+
   let url = cacheVoz.get(chave);
   if(!url){
     let blob = await doCofre(chave);              // ja guardado de outro dia?
     if(!blob){
-      if(semCotaHoje) return reserva();
+      if(!AZURE && semCotaHoje) return reserva();
       const antes = Larissa.estado;
       if(antes === "parada") Larissa.pensa(true);
-      try{ blob = await gerarVoz(texto); }catch(e){ blob = null; }
+      try{
+        blob = AZURE ? await gerarVozAzure(texto, vozAtual) : await gerarVoz(texto);
+      }catch(e){ blob = null; }
       if(Larissa.estado === "pensando") Larissa.vai(antes);
       if(!blob) return reserva();                 // sem cota ou sem rede
       paraCofre(chave, blob);                     // nunca mais gera esta frase
@@ -2281,8 +2321,11 @@ function verAjustes(){
         falar(L().saudacao, CFG.taxa);
       }}, "🔊 Testar a voz do aparelho"),
       h("div", {class:"note"}, h("span", {}, "🎙️"),
-        h("span", {}, h("b", {}, "Voz natural do Gemini. "),
-          "A mesma voz nos dois idiomas, bem mais natural que a do aparelho — mas limitada a 10 frases novas por dia no plano gratuito.")),
+        AZURE
+          ? h("span", {}, h("b", {}, "Voz natural da Azure. "),
+              "500 mil caracteres por mês de graça — cerca de 8 mil frases. Na prática, sem limite para o seu uso.")
+          : h("span", {}, h("b", {}, "Voz natural do Gemini. "),
+              "Mais natural que a do aparelho, mas limitada a 10 frases novas por dia no plano gratuito.")),
       h("div", {class:"seg", style:"max-width:340px"},
         h("button", {"aria-pressed": CFG.natural !== false,
           onclick:() => { CFG.natural = true; gravarCfg(); rotear(); }}, "Voz natural"),
@@ -2291,21 +2334,46 @@ function verAjustes(){
       CFG.natural !== false
         ? h("div", {class:"stack-s", style:"gap:8px"},
             h("span", {style:"font-size:13.5px; font-weight:600"}, "Qual voz — toque para ouvir"),
-            h("div", {class:"vozes"},
-              ...VOZES_IA.map(v => h("button", {
-                class:"vozbt" + ((CFG.vozIA || "Kore") === v ? " atual" : ""),
+            (() => {
+              const caixa = h("div", {class:"vozes"});
+              const botao = (valor, rotulo, atual, aplicar) => h("button", {
+                class:"vozbt" + (atual ? " atual" : ""),
                 onclick: async ev => {
                   const b = ev.currentTarget;
-                  CFG.vozIA = v; gravarCfg();
-                  b.parentElement.querySelectorAll(".vozbt").forEach(x => x.classList.toggle("atual", x === b));
+                  aplicar(valor); gravarCfg();
+                  caixa.querySelectorAll(".vozbt").forEach(x => x.classList.toggle("atual", x === b));
                   const antes = b.textContent;
                   b.disabled = true; b.textContent = "…";
                   try{ await falarPT("Oi! Sou a Larissa. Vamos estudar juntos hoje?"); }catch(e){}
                   b.disabled = false; b.textContent = antes;
-                }}, v))),
-            h("div", {class:"note warn"}, h("span", {}, "⏳"),
-              h("span", {}, h("b", {}, "10 por dia. "),
-                "O plano gratuito do Gemini gera 10 áudios por dia. Cada frase gerada fica guardada neste aparelho para sempre, então as falas que se repetem — as dicas dela — logo passam a tocar na hora e sem gastar cota. Passando de 10, ela usa a voz do aparelho até o dia seguinte.")))
+                }}, rotulo);
+
+              if(!AZURE){
+                caixa.append(...VOZES_IA.map(v =>
+                  botao(v, v, (CFG.vozIA || "Kore") === v, x => { CFG.vozIA = x; })));
+              }else{
+                caixa.append(h("span", {class:"lead", style:"font-size:12.5px"}, "carregando vozes…"));
+                listarVozesAzure().then(vs => {
+                  const fem = vs.filter(v => v.feminina);
+                  const escolhidas = (fem.length ? fem : vs).slice(0, 10);
+                  caixa.replaceChildren(...escolhidas.map(v => botao(
+                    v.nome,
+                    v.rotulo + (v.multilingue ? " ✦" : "") + (v.locale === "en-US" ? " (en)" : ""),
+                    (CFG.vozAzure || VOZ_AZ_PADRAO) === v.nome,
+                    x => { CFG.vozAzure = x; })));
+                  if(escolhidas.some(v => v.multilingue))
+                    caixa.append(h("span", {class:"lead", style:"font-size:12px; width:100%"},
+                      "✦ fala português e inglês com o mesmo timbre — a Larissa vira uma pessoa só nos dois idiomas."));
+                });
+              }
+              return caixa;
+            })(),
+            AZURE
+              ? h("p", {class:"lead", style:"font-size:12.5px"},
+                  "Cada frase gerada fica guardada neste aparelho para sempre, então o que se repete toca na hora e não consome nada.")
+              : h("div", {class:"note warn"}, h("span", {}, "⏳"),
+                  h("span", {}, h("b", {}, "10 por dia. "),
+                    "O plano gratuito do Gemini gera 10 áudios por dia. Cada frase fica guardada neste aparelho para sempre, então as falas que se repetem logo passam a tocar na hora. Passando de 10, ela usa a voz do aparelho até o dia seguinte.")))
         : null,
 
       h("span", {class:"eyebrow", style:"margin-top:8px"}, "Reserva: voz do aparelho"),

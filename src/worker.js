@@ -13,6 +13,72 @@ const GEMINI = "https://generativelanguage.googleapis.com/v1beta/models";
 const IDT = "https://identitytoolkit.googleapis.com/v1";
 const PROJETO = "destravaapp";
 
+/* Azure Speech: 500 mil caracteres por mes de graca, contra 10 audios por dia
+   do Gemini. Devolve MP3 pronto, entao nao precisa montar cabecalho WAV. */
+const AZ_FORMATO = "audio-24khz-48kbitrate-mono-mp3";
+const VOZ_OK = /^[a-z]{2}-[A-Z]{2}-[A-Za-z]{2,30}Neural$/;
+
+const escaparXml = t => String(t)
+  .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+  .replace(/"/g, "&quot;").replace(/'/g, "&apos;");
+
+async function vozAzure(request, env, livre){
+  if(!env.AZURE_KEY || !env.AZURE_REGION)
+    return json({ erro: "Azure não configurado no servidor." }, 503, livre);
+
+  const b = await request.json().catch(() => ({}));
+  const texto = String(b.texto || "").slice(0, 1500);
+  const voz = String(b.voz || "pt-BR-FranciscaNeural");
+  if (!texto.trim()) return json({ erro: "Sem texto." }, 400, livre);
+  if (!VOZ_OK.test(voz)) return json({ erro: "Nome de voz inválido." }, 400, livre);
+
+  const ssml =
+    `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="${voz.slice(0,5)}">` +
+    `<voice name="${voz}">${escaparXml(texto)}</voice></speak>`;
+
+  const r = await fetch(`https://${env.AZURE_REGION}.tts.speech.microsoft.com/cognitiveservices/v1`, {
+    method: "POST",
+    headers: {
+      "Ocp-Apim-Subscription-Key": env.AZURE_KEY,
+      "Content-Type": "application/ssml+xml",
+      "X-Microsoft-OutputFormat": AZ_FORMATO,
+      "User-Agent": "destrava",
+    },
+    body: ssml,
+  });
+  if (!r.ok)
+    return json({ erro: `Azure recusou (${r.status}).` }, 502, livre);
+
+  const h = new Headers(livre);
+  h.set("content-type", "audio/mpeg");
+  h.set("cache-control", "max-age=604800");
+  return new Response(r.body, { status: 200, headers: h });
+}
+
+async function vozesAzure(env, livre){
+  if(!env.AZURE_KEY || !env.AZURE_REGION) return json([], 503, livre);
+  const r = await fetch(
+    `https://${env.AZURE_REGION}.tts.speech.microsoft.com/cognitiveservices/voices/list`,
+    { headers: { "Ocp-Apim-Subscription-Key": env.AZURE_KEY } },
+  );
+  if(!r.ok) return json([], 502, livre);
+  const todas = await r.json().catch(() => []);
+  // so as neurais de portugues do Brasil e ingles americano, mulheres primeiro
+  const lista = (todas || [])
+    .filter(v => /^(pt-BR|en-US)$/.test(v.Locale) && /Neural/.test(v.ShortName))
+    .map(v => ({
+      nome: v.ShortName,
+      rotulo: v.LocalName || v.DisplayName || v.ShortName,
+      locale: v.Locale,
+      feminina: v.Gender === "Female",
+      multilingue: /Multilingual/i.test(v.ShortName),
+    }))
+    .sort((a, b) => (b.multilingue - a.multilingue) || (b.feminina - a.feminina)
+                 || a.rotulo.localeCompare(b.rotulo));
+  livre.set("cache-control", "max-age=86400");
+  return json(lista, 200, livre);
+}
+
 // Chave web do Firebase: publica por natureza, ja vai no HTML da pagina.
 // Identifica o projeto, nao autoriza nada sozinha.
 const CHAVE_WEB = "AIzaSyCPbpiqSsHqzrdGnw5RG0_i_Q85ThWQGeM";
@@ -196,10 +262,16 @@ export default {
 
     if (url.pathname === "/api/status") {
       livre.set("cache-control", "no-store");
-      return json({ chave: Boolean(env.GEMINI_KEY), admin: Boolean(env.SA_JSON) }, 200, livre);
+      return json({
+        chave: Boolean(env.GEMINI_KEY),
+        admin: Boolean(env.SA_JSON),
+        azure: Boolean(env.AZURE_KEY && env.AZURE_REGION),
+      }, 200, livre);
     }
 
     if (url.pathname === "/api/alunos") return alunos(request, env, livre);
+    if (url.pathname === "/api/voz" && request.method === "POST") return vozAzure(request, env, livre);
+    if (url.pathname === "/api/vozes") return vozesAzure(env, livre);
 
     // Quais modelos esta chave pode usar. O Google aposenta modelo sem aviso,
     // entao a lista vem dele, nao de uma constante no codigo.
