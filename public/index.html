@@ -242,6 +242,7 @@
 <div class="shell">
   <header class="topbar">
     <span class="brand">Destr<em>a</em>va</span>
+    <button class="chip" id="idioma" title="Trocar idioma">EN</button>
     <span class="chip flame" id="streak" title="Dias seguidos estudando">0 dias</span>
     <span class="chip" id="xp">0 xp</span>
   </header>
@@ -291,7 +292,7 @@ const msgAuth = e => ERRO_AUTH[e?.code] || "Não consegui entrar agora. Tente de
    (módulos 1–11 + viagem). As frases de pronúncia avançadas são as
    frases ISP do "Mairo Vergara 4.0" — o método de repetição de sentenças. */
 
-const CURRICULO = [
+const CURRICULO_EN = [
   { m:"Primeiros sons e o verbo ser", ls:[
     {id:"l01", t:"Pronúncia da terminação -ING", topic:"how the -ING ending is pronounced in English and why Brazilians add an extra vowel"},
     {id:"l02", t:"IS e ARE", topic:"the verb to be in the present: am, is, are"},
@@ -316,7 +317,7 @@ const CURRICULO = [
     {id:"l15", t:"DO e MAKE", topic:"the difference between do and make"},
     {id:"l16", t:"Plural dos substantivos", topic:"regular noun plurals: -s, -es, -ies"},
     {id:"l17", t:"Passado de TO HAVE", topic:"had, and had as the past of both have and have got"},
-    {id:"l18", t:"A terminação -ED", topic:"the three pronunciations of the -ed ending: /t/, /d/, /ɪd/"},
+    {id:"l18", t:"A terminação -ED", topic:"the three pronunciations of the -ed ending"},
     {id:"l19", t:"Números ordinais e o TH", topic:"ordinal numbers and how to pronounce the TH sound"},
   ]},
   { m:"Plurais e present perfect", ls:[
@@ -326,7 +327,7 @@ const CURRICULO = [
     {id:"l23", t:"Presente composto", topic:"present perfect: have/has + past participle, and why Portuguese speakers misuse it"},
   ]},
   { m:"Imperativo e demonstrativos", ls:[
-    {id:"l24", t:"Modo imperativo", topic:"the imperative for orders, instructions and invitations, plus let's"},
+    {id:"l24", t:"Modo imperativo", topic:"the imperative for orders, instructions and invitations, plus let us"},
     {id:"l25", t:"THIS, THESE, THAT, THOSE", topic:"demonstratives this, these, that, those by distance and number"},
   ]},
   { m:"Pronomes e quantidade", ls:[
@@ -336,18 +337,18 @@ const CURRICULO = [
     {id:"l29", t:"SOME e ANY", topic:"some and any in affirmative, negative and interrogative sentences"},
   ]},
   { m:"Comparar e negar", ls:[
-    {id:"l30", t:"Que horas são", topic:"telling the time in English, o'clock, past and to"},
-    {id:"l31", t:"Comparativos — THAN e AS", topic:"comparatives with -er/more ... than, and as ... as"},
+    {id:"l30", t:"Que horas são", topic:"telling the time in English, o clock, past and to"},
+    {id:"l31", t:"Comparativos — THAN e AS", topic:"comparatives with -er or more ... than, and as ... as"},
     {id:"l32", t:"Frases negativas", topic:"negative sentences with don't, doesn't, didn't and isn't"},
   ]},
   { m:"Perguntar", ls:[
     {id:"l33", t:"Presente interrogativo com DO", topic:"questions in the present with the auxiliary DO and DOES"},
-    {id:"l34", t:"Perguntas com WILL, WOULD, MAY", topic:"questions with the modal verbs will, would, may and might by inversion"},
+    {id:"l34", t:"Perguntas com WILL, WOULD, MAY", topic:"questions with the modal verbs by inversion"},
     {id:"l35", t:"Palavras interrogativas (WH)", topic:"question words: what, where, when, who, why, how"},
     {id:"l36", t:"Perguntas mais longas", topic:"longer questions: how much, how many, how long, what kind of"},
   ]},
   { m:"Juntando tudo", ls:[
-    {id:"l37", t:"Combinação verbal", topic:"phrasal verbs: common verb + particle combinations like get up, look for, give up"},
+    {id:"l37", t:"Combinação verbal", topic:"phrasal verbs: get up, look for, give up"},
     {id:"l38", t:"Preposições de lugar", topic:"prepositions of place: in, on, at, under, between"},
     {id:"l39", t:"Preposições de tempo", topic:"prepositions of time: in, on, at, for, since, ago"},
     {id:"l40", t:"O sistema verbal inglês", topic:"an overview of the English tense system and how the auxiliaries fit together"},
@@ -358,11 +359,71 @@ const CURRICULO = [
   ]},
 ];
 
-const LICOES = CURRICULO.flatMap((m, mi) => m.ls.map((l, li) => ({...l, mi, mod:m.m, num:li+1})));
-const TOTAL = LICOES.length;
-const byId = id => LICOES.find(l => l.id === id);
+const CURRICULO_IT = [
+  { m:"Os sons que enganam", ls:[
+    {id:"i01", t:"O alfabeto e as letras traiçoeiras", topic:"the Italian alphabet and the sounds that surprise Portuguese speakers: C and G before E or I, CH and GH, and double consonants"},
+    {id:"i02", t:"GLI, GN e SC", topic:"the Italian digraphs GLI, GN, SC and SCI, contrasted with Portuguese LH and NH"},
+    {id:"i03", t:"Essere — ser e estar", topic:"the verb essere in the present, and how Italian uses one verb where Portuguese uses both ser and estar"},
+  ]},
+  { m:"Nomes, gênero e artigos", ls:[
+    {id:"i04", t:"Masculino e feminino", topic:"noun gender in Italian, the -o and -a endings, and nouns whose gender differs from Portuguese"},
+    {id:"i05", t:"Artigos definidos", topic:"the definite articles il, lo, la, i, gli, le and the sound rules that choose between them"},
+    {id:"i06", t:"Artigos indefinidos", topic:"the indefinite articles un, uno, una and un apostrophe"},
+    {id:"i07", t:"Plural dos substantivos", topic:"Italian plurals ending in -i and -e, and why there is no plural -s"},
+    {id:"i08", t:"Avere — ter", topic:"the verb avere in the present, and expressions like avere fame, avere sete, avere anni"},
+  ]},
+  { m:"O presente dos verbos", ls:[
+    {id:"i09", t:"Verbos em -ARE", topic:"regular -are verbs in the present tense, such as parlare and mangiare"},
+    {id:"i10", t:"Verbos em -ERE", topic:"regular -ere verbs in the present tense, such as prendere and scrivere"},
+    {id:"i11", t:"Verbos em -IRE", topic:"regular -ire verbs in the present, including the -isc- group like capire and finire"},
+    {id:"i12", t:"Pronomes pessoais", topic:"Italian subject pronouns and why they are usually left out"},
+    {id:"i13", t:"Números", topic:"Italian cardinal numbers and how they join together"},
+  ]},
+  { m:"Perguntar e negar", ls:[
+    {id:"i14", t:"Frases negativas com NON", topic:"negation with non before the verb, and the double negatives that are correct in Italian"},
+    {id:"i15", t:"Palavras interrogativas", topic:"question words: chi, che cosa, dove, quando, perché, come, quanto"},
+    {id:"i16", t:"C'È e CI SONO", topic:"c e and ci sono for saying what exists or is present"},
+    {id:"i17", t:"Preposições simples", topic:"the simple prepositions di, a, da, in, con, su, per, tra and fra"},
+  ]},
+  { m:"Preposições e posse", ls:[
+    {id:"i18", t:"Preposições articuladas", topic:"articulated prepositions such as del, al, dal, nel and sul, which merge preposition and article"},
+    {id:"i19", t:"Possessivos", topic:"possessive adjectives used with the article, mio, tuo, suo, and the exception with family members"},
+    {id:"i20", t:"Molto, poco, troppo", topic:"quantity words molto, poco, troppo and tanto, and when they agree with the noun"},
+  ]},
+  { m:"O passado", ls:[
+    {id:"i21", t:"Passato prossimo com AVERE", topic:"the passato prossimo formed with avere plus the past participle"},
+    {id:"i22", t:"Passato prossimo com ESSERE", topic:"the passato prossimo with essere, which verbs take it, and participle agreement"},
+    {id:"i23", t:"Particípios irregulares", topic:"common irregular past participles: fatto, detto, visto, preso, letto"},
+    {id:"i24", t:"Imperfetto", topic:"the imperfetto for habits and descriptions in the past, and how it differs from the passato prossimo"},
+  ]},
+  { m:"Futuro, desejo e dever", ls:[
+    {id:"i25", t:"Futuro semplice", topic:"the simple future in Italian and its common irregular stems"},
+    {id:"i26", t:"Condizionale — vorrei", topic:"the conditional for polite requests and wishes: vorrei, potrei, mi piacerebbe"},
+    {id:"i27", t:"Potere, volere, dovere", topic:"the modal verbs potere, volere and dovere in the present"},
+  ]},
+  { m:"Pronomes", ls:[
+    {id:"i28", t:"Pronomes diretos", topic:"direct object pronouns lo, la, li, le and where they sit in the sentence"},
+    {id:"i29", t:"Pronomes indiretos", topic:"indirect object pronouns mi, ti, gli, le, ci, vi"},
+    {id:"i30", t:"CI e NE", topic:"the particles ci and ne, which have no direct equivalent in Portuguese"},
+  ]},
+  { m:"Reflexivos, ordens e comparação", ls:[
+    {id:"i31", t:"Verbos reflexivos", topic:"reflexive verbs such as chiamarsi, alzarsi and svegliarsi, and their pronouns"},
+    {id:"i32", t:"Imperativo", topic:"the imperative for tu, noi and voi, and the negative imperative with the infinitive"},
+    {id:"i33", t:"Comparativos e superlativos", topic:"comparatives with più and meno, and the absolute superlative ending in -issimo"},
+  ]},
+  { m:"Juntando tudo", ls:[
+    {id:"i34", t:"Que horas são", topic:"telling the time in Italian: sono le, è l una, mezzogiorno"},
+    {id:"i35", t:"Dias, meses e estações", topic:"days, months and seasons in Italian and the prepositions used with them"},
+    {id:"i36", t:"Congiuntivo — primeiro contato", topic:"a first look at the congiuntivo: penso che sia, credo che tu abbia"},
+    {id:"i37", t:"O sistema verbal italiano", topic:"an overview of how the Italian tenses fit together"},
+  ]},
+  { m:"Italiano para viagem", ls:[
+    {id:"i38", t:"Do aeroporto ao hotel", topic:"practical Italian for the airport, the taxi and hotel check-in"},
+    {id:"i39", t:"Restaurante e compras", topic:"practical Italian for ordering food, asking prices and shopping"},
+  ]},
+];
 
-const FRASES_BASE = [
+const FRASES_EN = [
   {en:"I am a student.", fig:"ai ém a stiúdent"},
   {en:"She is my sister.", fig:"xi iz mai síster"},
   {en:"The book is on the table.", fig:"dâ buk iz on dâ têibol"},
@@ -378,6 +439,24 @@ const FRASES_BASE = [
   {en:"I would like some water.", fig:"ai wud laik sâm uórâr"},
   {en:"What time is it?", fig:"uót taim iz it"},
   {en:"She has been here before.", fig:"xi héz bin hír bifór"},
+];
+
+const FRASES_IT = [
+  {en:"Io sono brasiliano.", fig:"ío sôno braziliáno"},
+  {en:"Come ti chiami?", fig:"côme ti quiámi"},
+  {en:"Il libro è sul tavolo.", fig:"il líbro é sul távolo"},
+  {en:"Oggi lavoriamo insieme.", fig:"ódji lavoriámo insiême"},
+  {en:"Domani ti chiamo.", fig:"dománi ti quiámo"},
+  {en:"Non mi piace il caffè.", fig:"non mi piáche il caffé"},
+  {en:"Dove stai andando?", fig:"dôve stái andándo"},
+  {en:"Ho tre fratelli.", fig:"ó tre fratélli"},
+  {en:"Ieri siamo andati al mare.", fig:"iéri siámo andáti al máre"},
+  {en:"Puoi aiutarmi, per favore?", fig:"puôi aiutármi per favôre"},
+  {en:"Questa è la mia canzone preferita.", fig:"cuésta é la mía canzône preferíta"},
+  {en:"Quanto costa?", fig:"cuánto cósta"},
+  {en:"Vorrei un bicchiere d'acqua.", fig:"vorrêi un biquiére dácua"},
+  {en:"Che ore sono?", fig:"que óre sôno"},
+  {en:"Sono già stato qui.", fig:"sôno djá státo cuí"},
 ];
 
 const FRASES_ISP = [
@@ -404,6 +483,36 @@ const FRASES_ISP = [
   "What once was a pile of dirt turned into a few motes.",
   "I managed to carry three full glasses without spilling a drop.",
 ].map(en => ({en, fig:null}));
+
+/* Cada idioma traz o proprio curriculo, as proprias frases e o proprio
+   locale de voz. A Larissa e a mesma professora nos dois. */
+const IDIOMAS = {
+  en: {
+    id:"en", nome:"Inglês", adj:"inglês", bandeira:"EN", locale:"en-US",
+    saudacao:"Hi! I am Larissa. Let us practice your English today.",
+    figEx:'"Do you know?" vira "du iú nôu"', oi:"hello",
+    curriculo: CURRICULO_EN, frases: FRASES_EN,
+    extra:{ nome:"Frases do seu Mairo Vergara 4.0", lista: FRASES_ISP },
+  },
+  it: {
+    id:"it", nome:"Italiano", adj:"italiano", bandeira:"IT", locale:"it-IT",
+    saudacao:"Ciao! Sono Larissa. Oggi pratichiamo il tuo italiano.",
+    figEx:'"Come stai?" vira "côme stái"', oi:"ciao",
+    curriculo: CURRICULO_IT, frases: FRASES_IT,
+    extra: null,
+  },
+};
+
+for(const k of Object.keys(IDIOMAS)){
+  const d = IDIOMAS[k];
+  d.licoes = d.curriculo.flatMap((m, mi) => m.ls.map((l, li) => ({...l, mi, mod:m.m, num:li+1})));
+}
+
+let IDIOMA = "en";
+const L = () => IDIOMAS[IDIOMA];
+const licoes = () => L().licoes;
+const total = () => licoes().length;
+const byId = id => licoes().find(l => l.id === id);
 
 /* ============================ 2. ESTADO ============================ */
 
@@ -440,10 +549,10 @@ function gravar(){
   clearTimeout(adiado);
   adiado = setTimeout(() => {
     const copia = JSON.parse(JSON.stringify(S));
-    copia.email = EMAIL;
-    copia.visto = new Date().toISOString();
     copia.licoesFeitas = Object.keys(S.feitas).length;
-    fila = fila.then(() => NUVEM.collection("usuarios").doc(UID).set(copia)).catch(() => {});
+    const doc = {email: EMAIL, visto: new Date().toISOString(), ultimoIdioma: IDIOMA};
+    doc[IDIOMA] = copia;   // merge: escrever um idioma nao apaga o outro
+    fila = fila.then(() => NUVEM.collection("usuarios").doc(UID).set(doc, {merge:true})).catch(() => {});
   }, 900);
 }
 
@@ -452,7 +561,7 @@ async function puxarDaNuvem(){
   try{
     const snap = await NUVEM.collection("usuarios").doc(UID).get();
     if(!snap.exists) return;
-    const r = snap.data();
+    const r = (snap.data() || {})[IDIOMA];
     if(r && typeof r.em === "number" && r.em > (S.em || 0)){
       S = Object.assign(NOVO(), r);
       try{ localStorage.setItem(LS, JSON.stringify(S)); }catch(e){}
@@ -665,7 +774,7 @@ function ouvir({onParcial, onFim, onErro}){
   if(!TEM_MIC) return onErro?.("sem-suporte");
   try{ rec?.abort(); }catch(e){}
   rec = new RecCls();
-  rec.lang = "en-US"; rec.interimResults = true; rec.continuous = false; rec.maxAlternatives = 1;
+  rec.lang = L().locale; rec.interimResults = true; rec.continuous = false; rec.maxAlternatives = 1;
   let texto = "";
   rec.onresult = ev => {
     let t = "";
@@ -686,7 +795,8 @@ const MASCULINAS = /(male|alex|daniel|fred|tom|thomas|guy|david|mark|james|ryan|
 
 let vozes = [];
 function carregarVozes(){
-  try{ vozes = (speechSynthesis.getVoices() || []).filter(v => /^en/i.test(v.lang)); }catch(e){ vozes = []; }
+  const pre = L().locale.slice(0, 2);
+  try{ vozes = (speechSynthesis.getVoices() || []).filter(v => v.lang && v.lang.toLowerCase().startsWith(pre)); }catch(e){ vozes = []; }
 }
 if(window.speechSynthesis){
   carregarVozes();
@@ -699,9 +809,11 @@ function vozLarissa(){
     const escolhida = vozes.find(v => v.voiceURI === CFG.voz || v.name === CFG.voz);
     if(escolhida) return escolhida;
   }
-  return vozes.find(v => /en[-_]US/i.test(v.lang) && FEMININAS.test(v.name))
+  const alvo = L().locale.toLowerCase().replace("-", "_");
+  const casa = v => v.lang && v.lang.toLowerCase().replace("-", "_") === alvo;
+  return vozes.find(v => casa(v) && FEMININAS.test(v.name))
       || vozes.find(v => FEMININAS.test(v.name))
-      || vozes.find(v => /en[-_]US/i.test(v.lang) && !MASCULINAS.test(v.name))
+      || vozes.find(v => casa(v) && !MASCULINAS.test(v.name))
       || vozes.find(v => !MASCULINAS.test(v.name))
       || vozes[0] || null;
 }
@@ -712,7 +824,7 @@ function falar(texto, taxa){
     speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(texto);
     const v = vozLarissa();
-    if(v){ u.voice = v; u.lang = v.lang; } else u.lang = "en-US";
+    if(v){ u.voice = v; u.lang = v.lang; } else u.lang = L().locale;
     u.rate = taxa ?? CFG.taxa ?? 0.92;
     u.pitch = 1.08;                 // um tom levemente mais alto
     speechSynthesis.speak(u);
@@ -797,6 +909,12 @@ function pintarNav(){
 }
 
 function pintarTopo(){
+  const bt = $("idioma");
+  if(bt){
+    bt.textContent = L().bandeira;
+    bt.title = `Estudando ${L().nome}. Toque para trocar.`;
+    bt.onclick = () => trocarIdioma(IDIOMA === "en" ? "it" : "en");
+  }
   const n = S.streak.n || 0;
   $("streak").textContent = n === 1 ? "1 dia" : n + " dias";
   $("xp").textContent = (S.xp || 0) + " xp";
@@ -843,7 +961,7 @@ function verSetup(){
 
 /* ---------- Trilha ---------- */
 
-const proxima = () => LICOES.find(l => !S.feitas[l.id]) || null;
+const proxima = () => licoes().find(l => !S.feitas[l.id]) || null;
 
 function verTrilha(){
   const feitas = Object.keys(S.feitas).length;
@@ -854,15 +972,15 @@ function verTrilha(){
         h("span", {class:"eyebrow"}, feitas === 0 ? "Comece aqui" : "Continue de onde parou"),
         h("div", {}, h("div", {class:"n"}, p.mod), h("h2", {style:"margin-top:2px"}, p.t)),
         h("button", {class:"btn primary wide", onclick:() => { licaoAberta = p.id; rotear(); }}, "Estudar esta lição"),
-        h("div", {class:"bar"}, h("i", {style:`width:${Math.round(100*feitas/TOTAL)}%`})),
-        h("div", {class:"n"}, `${feitas} de ${TOTAL} lições`))
+        h("div", {class:"bar"}, h("i", {style:`width:${Math.round(100*feitas/total())}%`})),
+        h("div", {class:"n"}, `${feitas} de ${total()} lições`))
     : h("div", {class:"hero"},
         h("span", {class:"eyebrow"}, "Trilha completa"),
-        h("h2", {}, "Você terminou as 42 lições"),
+        h("h2", {}, `Você terminou as ${total()} lições de ${L().nome.toLowerCase()}`),
         h("p", {class:"lead"}, "Agora o treino é conversar. Fale com a Larissa todo dia."),
         h("button", {class:"btn primary wide", onclick:() => { aba = "falar"; rotear(); }}, "Ir conversar"));
 
-  const mods = CURRICULO.map(m => {
+  const mods = L().curriculo.map(m => {
     const done = m.ls.filter(l => S.feitas[l.id]).length;
     return h("section", {class:"mod"},
       h("div", {class:"mod-head"}, h("span", {class:"t"}, m.m), h("span", {class:"c"}, `${done}/${m.ls.length}`)),
@@ -920,8 +1038,8 @@ async function verLicao(id, refazer){
     h("span", {class:"spin"}), h("span", {class:"lead"}, "Larissa está preparando sua aula…")));
 
   const sistema =
-`Você é Larissa, uma professora de inglês brasileira: didática, calorosa e direta. Ensina adultos brasileiros iniciantes.
-Explique SEMPRE em português do Brasil. Em todo exemplo em inglês, inclua a "pronúncia figurada" no estilo brasileiro (exemplo: "Do you know?" vira "du iú nôu").
+`Você é Larissa, uma professora de ${L().adj} brasileira: didática, calorosa e direta. Ensina adultos brasileiros iniciantes.
+Explique SEMPRE em português do Brasil. Em todo exemplo em ${L().adj}, inclua a "pronúncia figurada" no estilo brasileiro (exemplo: ${L().figEx}).
 Responda somente com JSON válido, sem comentários e sem texto fora do JSON.`;
 
   const prompt =
@@ -932,11 +1050,11 @@ Formato exato do JSON:
 {
  "resumo": "uma frase dizendo o que o aluno vai conseguir fazer depois desta lição",
  "pontos": [{"titulo":"nome curto da regra","texto":"explicação de 1 a 3 frases em português"}],
- "exemplos": [{"en":"frase em inglês","pt":"tradução","fig":"pronúncia figurada"}],
+ "exemplos": [{"en":"frase em ${L().adj}","pt":"tradução","fig":"pronúncia figurada"}],
  "atencao": "um erro que brasileiros cometem neste tópico, em uma frase",
  "exercicios": [
    {"tipo":"escolha","pergunta":"enunciado em português","opcoes":["a","b","c"],"resposta":0,"porque":"por que essa é a certa"},
-   {"tipo":"traduzir","pergunta":"frase em português para traduzir","resposta":"a frase em inglês","porque":"observação curta"}
+   {"tipo":"traduzir","pergunta":"frase em português para traduzir","resposta":"a frase em ${L().adj}","porque":"observação curta"}
  ]
 }
 Use 3 pontos, 5 exemplos e exatamente 5 exercícios misturando os dois tipos. Em "escolha", "resposta" é o índice da opção certa.${refazer ? " Esta é uma nova versão da mesma aula: use exemplos e exercícios diferentes dos habituais." : ""}`;
@@ -996,7 +1114,7 @@ function montarLicao(l, cabeca, d){
       }}, o));
       btns.forEach(b => bloco.append(b));
     } else {
-      const campo = h("input", {class:"inp", type:"text", id:`ex${i}`, placeholder:"Escreva em inglês…",
+      const campo = h("input", {class:"inp", type:"text", id:`ex${i}`, placeholder:`Escreva em ${L().adj}…`,
         autocapitalize:"none", autocorrect:"off", spellcheck:"false"});
       const certa = String(q.resposta || "");
       const enviar = h("button", {class:"btn primary sm", onclick:() => {
@@ -1052,11 +1170,11 @@ async function julgar(btn, minha, certa, pergunta){
   btn.disabled = true; btn.textContent = "Conferindo…";
   try{
     const t = await pedir({rapido:true,
-      sistema:"Você é Larissa, professora de inglês brasileira. Responda em português do Brasil, no máximo 2 frases.",
-      prompt:`Um aluno traduziu para o inglês a frase: "${pergunta}"
+      sistema:`Você é Larissa, professora de ${L().adj} brasileira. Responda em português do Brasil, no máximo 2 frases.`,
+      prompt:`Um aluno traduziu para o ${L().adj} a frase: "${pergunta}"
 Resposta esperada: "${certa}"
 Resposta do aluno: "${minha}"
-A resposta do aluno também está correta em inglês natural? Comece por "Vale" ou "Não vale".`});
+A resposta do aluno também está correta em ${L().adj} natural? Comece por "Vale" ou "Não vale".`});
     btn.replaceWith(h("div", {class:"why"}, t));
   }catch(e){ btn.disabled = false; btn.textContent = msgErro(e) || "Tentar de novo"; }
 }
@@ -1076,11 +1194,11 @@ let ctl = null;
 const SISTEMA_CHAT = () => {
   const n = Object.keys(S.feitas).length;
   const nivel = n < 8 ? "bem iniciante, sabe pouquíssimo inglês" : n < 20 ? "iniciante" : n < 34 ? "intermediário baixo" : "intermediário";
-  return `Você é Larissa, uma professora de inglês brasileira conversando por voz com um aluno de nível ${nivel}. Você é calorosa, paciente e breve.
+  return `Você é Larissa, uma professora de ${L().adj} brasileira conversando por voz com um aluno de nível ${nivel}. Você é calorosa, paciente e breve.
 Responda SEMPRE exatamente neste formato, quatro linhas, nada fora dele:
-EN: <sua resposta em inglês, 1 a 2 frases curtas, no nível do aluno, terminando com uma pergunta>
+EN: <sua resposta em ${L().adj}, 1 a 2 frases curtas, no nível do aluno, terminando com uma pergunta>
 PT: <tradução curta da linha EN>
-FIX: <se a última mensagem do aluno tiver erro de inglês, escreva só a frase dele corrigida; se não tiver erro, escreva exatamente ok>
+FIX: <se a última mensagem do aluno tiver erro de ${L().adj}, escreva só a frase dele corrigida; se não tiver erro, escreva exatamente ok>
 TIP: <se houver correção, uma linha em português explicando o erro; se não houver, deixe vazio>
 Nunca escreva parágrafos longos. Nunca saia do formato. Nunca use asteriscos nem markdown.`;
 };
@@ -1146,7 +1264,7 @@ function painelConversa(){
 
   if(turnos.length === 0){
     lista.append(h("div", {class:"empty"},
-      "Diga qualquer coisa em inglês — nem que seja ", h("i", {}, "hello"), ".",
+      `Diga qualquer coisa em ${L().adj} — nem que seja `, h("i", {}, L().oi), ".",
       h("br"), "Larissa responde, corrige e pergunta de volta."));
   } else {
     for(const t of turnos){
@@ -1180,7 +1298,7 @@ function alternarMic(campo){
 /* ---------- Pronúncia ---------- */
 
 let banco = "base", idx = 0;
-const frases = () => banco === "base" ? FRASES_BASE : FRASES_ISP;
+const frases = () => (banco === "extra" && L().extra) ? L().extra.lista : L().frases;
 
 function painelPronuncia(){
   const lista = frases();
@@ -1196,7 +1314,9 @@ function painelPronuncia(){
 
   const troca = h("div", {class:"seg", style:"max-width:340px"},
     h("button", {"aria-pressed": banco === "base", onclick:() => { banco = "base"; idx = 0; rotear(); }}, "Básicas"),
-    h("button", {"aria-pressed": banco === "isp", onclick:() => { banco = "isp"; idx = 0; rotear(); }}, "Frases ISP"));
+    L().extra
+      ? h("button", {"aria-pressed": banco === "extra", onclick:() => { banco = "extra"; idx = 0; rotear(); }}, "Frases ISP")
+      : null);
 
   const avisos = [];
   if(!TEM_MIC) avisos.push(h("div", {class:"note"}, h("span", {}, "🎙️"),
@@ -1205,7 +1325,7 @@ function painelPronuncia(){
 
   return h("div", {class:"stack"},
     ...avisos, troca,
-    h("span", {class:"eyebrow"}, banco === "isp" ? "Frases do seu Mairo Vergara 4.0" : "Frases da trilha"),
+    h("span", {class:"eyebrow"}, banco === "extra" && L().extra ? L().extra.nome : "Frases da trilha"),
     h("div", {class:"panel lift stack"},
       palavrasEl,
       f.fig ? h("span", {class:"fig", style:"font-size:14px"}, f.fig) : null,
@@ -1274,8 +1394,8 @@ async function explicarFala(btn, alvo, ouvido, errou){
   btn.replaceChildren(h("span", {class:"spin"}), document.createTextNode(" Larissa está ouvindo…"));
   try{
     const t = await pedir({
-      sistema:"Você é Larissa, professora de inglês brasileira. Responda em português do Brasil, em no máximo 4 linhas curtas. Use pronúncia figurada brasileira entre aspas. Sem markdown.",
-      prompt:`Um aluno brasileiro tentou dizer esta frase em inglês em voz alta:
+      sistema:`Você é Larissa, professora de ${L().adj} brasileira. Responda em português do Brasil, em no máximo 4 linhas curtas. Use pronúncia figurada brasileira entre aspas. Sem markdown.`,
+      prompt:`Um aluno brasileiro tentou dizer esta frase em ${L().adj} em voz alta:
 ALVO: "${alvo}"
 O reconhecimento de voz do aparelho entendeu: "${ouvido}"
 Palavras do alvo que não bateram: ${errou.join(", ")}
@@ -1294,11 +1414,11 @@ function verProgresso(){
   const faladas = Object.keys(S.falados).length;
 
   const tiles = h("div", {class:"tiles"},
-    h("div", {class:"tile"}, h("div", {class:"v"}, feitas), h("div", {class:"k"}, `de ${TOTAL} lições`)),
+    h("div", {class:"tile"}, h("div", {class:"v"}, feitas), h("div", {class:"k"}, `de ${total()} lições`)),
     h("div", {class:"tile"}, h("div", {class:"v", style:"color:var(--signal)"}, S.streak.n || 0), h("div", {class:"k"}, "dias seguidos")),
     h("div", {class:"tile"}, h("div", {class:"v", style:"color:var(--accent)"}, faladas), h("div", {class:"k"}, "frases faladas")));
 
-  const porMod = CURRICULO.map(m => {
+  const porMod = L().curriculo.map(m => {
     const d = m.ls.filter(l => S.feitas[l.id]).length;
     return h("div", {class:"stack-s", style:"gap:5px"},
       h("div", {class:"row", style:"justify-content:space-between; gap:8px"},
@@ -1335,8 +1455,8 @@ async function treinarErros(btn){
   const lista = S.erros.slice(0, 12).map(e => `- errado: "${e.was}" | certo: "${e.now}"`).join("\n");
   try{
     const d = await pedirJSON({
-      sistema:"Você é Larissa, professora de inglês brasileira. Responda somente com JSON válido, sem texto fora dele. Enunciados em português do Brasil.",
-      prompt:`Estes são erros reais de inglês de um aluno brasileiro:
+      sistema:`Você é Larissa, professora de ${L().adj} brasileira. Responda somente com JSON válido, sem texto fora dele. Enunciados em português do Brasil.`,
+      prompt:`Estes são erros reais de ${L().adj} de um aluno brasileiro:
 ${lista}
 
 Monte 5 perguntas de revisão de múltipla escolha focadas exatamente nesses erros.
@@ -1397,17 +1517,17 @@ function verAjustes(){
     h("h2", {}, "Ajustes"),
 
     h("div", {class:"panel stack-s"},
-      h("span", {class:"eyebrow"}, "Voz da Larissa"),
+      h("span", {class:"eyebrow"}, `Voz da Larissa em ${L().nome.toLowerCase()}`),
       voz,
       vozes.length === 0
-        ? h("p", {class:"lead"}, "Nenhuma voz em inglês encontrada neste aparelho ainda. No Android, instale em Configurações › Idioma › Saída de texto para voz.")
+        ? h("p", {class:"lead"}, `Nenhuma voz em ${L().nome.toLowerCase()} encontrada neste aparelho. No Android, instale em Configurações › Idioma › Saída de texto para voz.`)
         : h("p", {class:"lead"}, atual ? `Usando agora: ${atual.name}.` : "Nenhuma voz selecionada."),
       h("div", {class:"row"},
         h("span", {style:"font-size:13.5px; font-weight:600"}, "Velocidade"), taxaV),
       taxa,
       h("button", {class:"btn", style:"align-self:flex-start", onclick:() => {
         CFG.voz = voz.value; CFG.taxa = Number(taxa.value); gravarCfg();
-        falar("Hi! I'm Larissa. Let's practice your English today.", CFG.taxa);
+        falar(L().saudacao, CFG.taxa);
       }}, "🔊 Testar esta voz"),
       h("p", {class:"lead", style:"font-size:12.5px"},
         "As vozes disponíveis vêm do seu aparelho, não do app. No Chrome do Android as melhores costumam ser as do Google; no iPhone, Samantha.")),
@@ -1455,7 +1575,7 @@ function verAjustes(){
     h("div", {class:"panel stack-s"},
       h("span", {class:"eyebrow"}, "Aulas salvas"),
       h("p", {class:"lead"},
-        `${Object.keys(cacheLicao).length} de ${TOTAL} aulas já geradas e guardadas neste aparelho. Elas abrem na hora, funcionam sem internet e não gastam cota do Gemini de novo.`),
+        `${Object.keys(cacheLicao).length} aulas já geradas e guardadas neste aparelho. Elas abrem na hora, funcionam sem internet e não gastam cota do Gemini de novo.`),
       h("button", {class:"btn ghost sm", style:"align-self:flex-start", onclick: limparAulas}, "Limpar aulas salvas")),
 
     h("div", {class:"note warn"}, h("span", {}, "🔐"),
@@ -1559,7 +1679,7 @@ function verLogin(aviso, semLogin){
     h("div", {class:"hero"},
       h("span", {class:"eyebrow"}, "Acesso"),
       h("h2", {}, "Entre para estudar"),
-      h("p", {class:"lead"}, "A Larissa está do outro lado. Use o e-mail e a senha que você recebeu."),
+      h("p", {class:"lead"}, "A Larissa ensina inglês e italiano. Use o e-mail e a senha que você recebeu."),
       email, senha, recado, entrar,
       h("button", {class:"btn ghost sm", style:"align-self:center", onclick: esqueci}, "Esqueci minha senha")),
 
@@ -1575,12 +1695,30 @@ function verLogin(aviso, semLogin){
             "As contas são criadas pelo administrador — não há cadastro aberto nesta página.")));
 }
 
+function chaves(){
+  const base = UID === "local" ? "" : "." + UID;
+  LS = "destrava.estado.v1" + base + "." + IDIOMA;
+  LS_CFG = "destrava.cfg.v1" + base;
+}
+
+/* Cada idioma tem trilha, progresso e voz proprios. Trocar recarrega tudo. */
+function trocarIdioma(novo){
+  if(!IDIOMAS[novo] || novo === IDIOMA) return;
+  IDIOMA = novo;
+  try{ localStorage.setItem("destrava.idioma", novo); }catch(e){}
+  chaves();
+  // O ingles herda o progresso anterior a existencia do italiano.
+  S = ler(LS, NOVO, novo === "en" ? ["destrava.estado.v1." + UID, "destrava.estado.v1"] : []);
+  carregarVozes();
+  aba = "trilha"; licaoAberta = null; turnos = []; banco = "base"; idx = 0;
+  pintarTopo(); rotear(); puxarDaNuvem();
+}
+
 function entrarNoApp(uid, email){
   UID = uid; EMAIL = email || "(sem e-mail)";
-  // No modo sem conta, usa as chaves antigas: e o progresso que ja existia.
-  LS = uid === "local" ? "destrava.estado.v1" : "destrava.estado.v1." + uid;
-  LS_CFG = uid === "local" ? "destrava.cfg.v1" : "destrava.cfg.v1." + uid;
-  S = ler(LS, NOVO, ["destrava.estado.v1", "larissa.estado.v1"]);
+  try{ IDIOMA = IDIOMAS[localStorage.getItem("destrava.idioma")] ? localStorage.getItem("destrava.idioma") : "en"; }catch(e){ IDIOMA = "en"; }
+  chaves();
+  S = ler(LS, NOVO, ["destrava.estado.v1." + uid, "destrava.estado.v1", "larissa.estado.v1"]);
   CFG = ler(LS_CFG, CFG_NOVO, ["destrava.cfg.v1", "larissa.cfg.v1"]);
   if(!MODELOS.some(m => m.v === CFG.modelo)) CFG.modelo = CFG_NOVO().modelo;
 
