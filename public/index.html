@@ -1384,7 +1384,8 @@ function verAjustes(){
       h("span", {class:"eyebrow"}, "Sua conta"),
       h("p", {class:"lead"}, EMAIL || "—"),
       h("button", {class:"btn", style:"align-self:flex-start",
-        onclick:() => { try{ AUTH?.signOut(); }catch(e){} }}, "Sair")),
+        onclick:() => { if(UID === "local"){ UID = null; verLogin(undefined, true); } else { try{ AUTH?.signOut(); }catch(e){} } }},
+        UID === "local" ? "Voltar para a tela de acesso" : "Sair")),
 
     h("div", {class:"panel stack-s"},
       h("span", {class:"eyebrow"}, "Seu progresso"),
@@ -1460,7 +1461,7 @@ function apagar(){
 
 const chips = () => document.querySelectorAll(".topbar .chip");
 
-function verLogin(aviso){
+function verLogin(aviso, semLogin){
   $("nav").hidden = true;
   chips().forEach(c => { c.hidden = true; });
 
@@ -1504,15 +1505,24 @@ function verLogin(aviso){
       h("p", {class:"lead"}, "A Larissa está do outro lado. Use o e-mail e a senha que você recebeu."),
       email, senha, recado, entrar,
       h("button", {class:"btn ghost sm", style:"align-self:center", onclick: esqueci}, "Esqueci minha senha")),
-    h("div", {class:"note"}, h("span", {}, "🔑"),
-      h("span", {}, h("b", {}, "Sem acesso? "),
-        "As contas são criadas pelo administrador — não há cadastro aberto nesta página.")));
+
+    semLogin
+      ? h("div", {class:"panel stack-s"},
+          h("div", {class:"note warn"}, h("span", {}, "⚠️"),
+            h("span", {}, h("b", {}, "O login ainda não foi ativado neste projeto. "),
+              "Enquanto isso, dá para estudar sem conta — o progresso fica só neste aparelho e ninguém é monitorado.")),
+          h("button", {class:"btn primary wide", onclick:() => entrarNoApp("local", "modo pessoal, sem login")},
+            "Estudar sem conta neste aparelho"))
+      : h("div", {class:"note"}, h("span", {}, "🔑"),
+          h("span", {}, h("b", {}, "Sem acesso? "),
+            "As contas são criadas pelo administrador — não há cadastro aberto nesta página.")));
 }
 
-function entrarNoApp(u){
-  UID = u.uid; EMAIL = u.email || "(sem e-mail)";
-  LS = "destrava.estado.v1." + UID;
-  LS_CFG = "destrava.cfg.v1." + UID;
+function entrarNoApp(uid, email){
+  UID = uid; EMAIL = email || "(sem e-mail)";
+  // No modo sem conta, usa as chaves antigas: e o progresso que ja existia.
+  LS = uid === "local" ? "destrava.estado.v1" : "destrava.estado.v1." + uid;
+  LS_CFG = uid === "local" ? "destrava.cfg.v1" : "destrava.cfg.v1." + uid;
   S = ler(LS, NOVO, ["destrava.estado.v1", "larissa.estado.v1"]);
   CFG = ler(LS_CFG, CFG_NOVO, ["destrava.cfg.v1", "larissa.cfg.v1"]);
   if(!MODELOS.some(m => m.v === CFG.modelo)) CFG.modelo = CFG_NOVO().modelo;
@@ -1532,12 +1542,29 @@ function semAuth(){
       "Não consegui carregar o Firebase Authentication. Verifique sua conexão e recarregue a página.")));
 }
 
+/* Pergunta ao Google se o login por e-mail/senha existe neste projeto. Uma
+   credencial proposital invalida: se o login estiver ligado, ele responde
+   "credencial invalida"; se nao estiver, responde que nao ha configuracao. */
+async function loginAtivado(){
+  try{
+    const r = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${FB.apiKey}`, {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({email:"sonda@destrava.invalid", password:"sonda-apenas", returnSecureToken:true}),
+    });
+    const m = (await r.json())?.error?.message || "";
+    return !(m === "CONFIGURATION_NOT_FOUND" || m === "OPERATION_NOT_ALLOWED");
+  }catch(e){ return true; }   // na dúvida, mostra o login normal
+}
+
 function iniciarAuth(){
   if(typeof firebase === "undefined" || !firebase.auth) return semAuth();
   try{
     firebase.initializeApp(FB);
     AUTH = firebase.auth();
-    AUTH.onAuthStateChanged(u => { if(u) entrarNoApp(u); else verLogin(); });
+    AUTH.onAuthStateChanged(async u => {
+      if(u) return entrarNoApp(u.uid, u.email);
+      verLogin(undefined, !(await loginAtivado()));
+    });
   }catch(e){ semAuth(); }
 }
 
