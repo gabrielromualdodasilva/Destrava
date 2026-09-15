@@ -44,6 +44,6 @@ await new Promise(r => setTimeout(r, 900));
 const conta = sel => d.querySelectorAll(sel).length;
 console.log("  #view ...............", d.getElementById("view").children.length, "elementos");
 console.log("  abas na navegacao ...", conta("#nav button"));
-console.log("  Larissa no palco ....", conta(".palco .face"), "imagens");
+console.log("  Larissa no palco ....", conta(".palco .bn-olho") + conta(".palco .bn-fio"), "pecas animadas");
 console.log("  licoes na trilha ....", conta(".les"));
 console.log(erros.length ? "\nERROS:\n" + erros.slice(0, 2).join("\n---\n") : "\n  nenhum erro");
