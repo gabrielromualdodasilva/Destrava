@@ -148,14 +148,23 @@
   .cartao .bar{width:100%; margin-top:4px}
 
   /* Larissa dando o recado na trilha */
+  /* A Larissa nao fica numa moldura: ela se debruca pela borda do cartao,
+     e o proprio cartao corta o corpo dela na altura do peito. */
   .recado{
-    display:flex; flex-direction:row-reverse; gap:14px; align-items:center;
-    background:var(--surface); border-radius:var(--r); padding:14px 16px;
-    box-shadow:var(--shadow);
+    position:relative; display:block; overflow:hidden; min-height:120px;
+    background:var(--surface); border-radius:var(--r);
+    padding:16px 132px 16px 18px; box-shadow:var(--shadow);
   }
-  .recado .palco{flex:0 0 auto}
-  .recado .palco .halo{width:88px}
-  .recado .texto{display:flex; flex-direction:column; gap:6px; min-width:0; flex:1}
+  .recado .palco{position:absolute; right:-4px; bottom:-30px; width:130px; gap:0}
+  .recado .palco .halo{width:130px}
+  .recado .palco .legenda{display:none}
+  .recado .palco .pensa{top:8%; right:6%}
+  .recado .texto{display:flex; flex-direction:column; gap:6px; min-width:0}
+  @media (max-width:520px){
+    .recado{padding-right:104px; min-height:104px}
+    .recado .palco{width:104px; right:-6px; bottom:-22px}
+    .recado .palco .halo{width:104px}
+  }
   .recado .fala{font-family:var(--serif); font-size:17px; line-height:1.35; text-wrap:balance}
   .recado .acoes{display:flex; gap:8px; flex-wrap:wrap}
   @media (min-width:640px){ .recado .palco .halo{width:104px} }
@@ -284,16 +293,27 @@
   /* ---------- Larissa ---------- */
   .palco{position:relative; display:flex; flex-direction:column; align-items:center; gap:10px}
   .palco .halo{
-    position:relative; width:min(62vw, 230px); aspect-ratio:1; border-radius:50%;
-    background:radial-gradient(circle at 50% 34%, var(--accent-soft), var(--surface-2) 72%);
-    overflow:hidden; box-shadow:0 2px 6px rgba(0,0,0,.1), 0 12px 30px rgba(0,0,0,.14);
-    transition:box-shadow .35s ease;
+    position:relative; width:min(58vw, 215px); aspect-ratio:1;
+    overflow:visible; background:none;
   }
+  /* brilho difuso no lugar da moldura: ela fica solta na pagina */
+  .palco .halo::before{
+    content:""; position:absolute; inset:6% 4% 14% 4%; border-radius:50%;
+    background:radial-gradient(circle at 50% 42%, var(--accent-soft), transparent 68%);
+    opacity:.7; transition:opacity .35s ease;
+  }
+  .palco[data-larissa="ouvindo"] .halo::before{
+    background:radial-gradient(circle at 50% 42%, rgba(192,90,99,.34), transparent 68%);
+    animation:brilhoPulso 1.6s ease-in-out infinite;
+  }
+  .palco[data-larissa="falando"] .halo::before{opacity:1}
+  @keyframes brilhoPulso{0%,100%{opacity:.45}50%{opacity:1}}
+  .palco .halo svg{filter:drop-shadow(0 6px 14px rgba(0,0,0,.28))}
   .palco .halo svg{width:100%; height:100%; display:block}
 
   /* o corpo inteiro respira; a cabeca reage ao estado */
   .bn{transform-origin:100px 190px; animation:bnRespira 4.4s ease-in-out infinite}
-  .bn-cabeca{transform-origin:100px 130px; transition:transform .45s cubic-bezier(.34,1.3,.5,1)}
+  .bn-cabeca{transform-origin:100px 126px; transition:transform .45s cubic-bezier(.34,1.3,.5,1)}
   .palco[data-larissa="ouvindo"] .bn-cabeca{transform:rotate(-7deg) translateY(-1px)}
   .palco[data-larissa="pensando"] .bn-cabeca{transform:rotate(5deg)}
   .palco[data-larissa="falando"] .bn-cabeca{animation:bnAcena 1.05s ease-in-out infinite}
@@ -326,13 +346,6 @@
   @keyframes bnAcena{0%,100%{transform:rotate(-1.4deg)}50%{transform:rotate(1.4deg)}}
   @keyframes bnPula{0%,100%{transform:translateY(0)}32%{transform:translateY(-12px)}64%{transform:translateY(0) scale(.99)}}
 
-  .palco[data-larissa="ouvindo"] .halo{
-    box-shadow:0 0 0 0 rgba(192,90,99,.4); animation:ouvindoPulso 1.6s ease-out infinite;
-  }
-  @keyframes ouvindoPulso{
-    0%{box-shadow:0 0 0 0 rgba(192,90,99,.4)}
-    100%{box-shadow:0 0 0 24px rgba(192,90,99,0)}
-  }
 
   .palco .pensa{
     position:absolute; top:4%; right:0; display:flex; gap:5px; align-items:flex-end;
@@ -1159,12 +1172,12 @@ function alinhar(alvo, ouvido){
    o cabelo, bate palminha. E o que uma foto parada nunca faz. */
 
 const BOCAS = {
-  fechada: "M91 114 Q100 121 109 114 Q100 117 91 114 Z",
-  leve:    "M90 113 Q100 124 110 113 Q100 119 90 113 Z",
-  media:   "M88 112 Q100 130 112 112 Q100 121 88 112 Z",
-  larga:   "M86 111 Q100 136 114 111 Q100 123 86 111 Z",
-  o:       "M94 112 Q100 108 106 112 Q106 124 100 127 Q94 124 94 112 Z",
-  sorriso: "M85 112 Q100 132 115 112 Q100 120 85 112 Z",
+  fechada: "M93 110 Q100 116 107 110 Q100 113 93 110 Z",
+  leve:    "M92 109 Q100 119 108 109 Q100 114 92 109 Z",
+  media:   "M90 108 Q100 125 110 108 Q100 116 90 108 Z",
+  larga:   "M88 107 Q100 131 112 107 Q100 118 88 107 Z",
+  o:       "M95 108 Q100 104 105 108 Q105 119 100 122 Q95 119 95 108 Z",
+  sorriso: "M87 108 Q100 127 113 108 Q100 115 87 108 Z",
 };
 
 function avatarLarissa(){
@@ -1172,66 +1185,69 @@ function avatarLarissa(){
 <svg viewBox="0 0 200 200" role="img" aria-label="Larissa, sua professora">
   <defs>
     <linearGradient id="bnCabelo" x1=".2" y1="0" x2=".7" y2="1">
-      <stop offset="0%" stop-color="#3A2417"/><stop offset="100%" stop-color="#1B100A"/>
+      <stop offset="0%" stop-color="#3D2618"/><stop offset="100%" stop-color="#1C110A"/>
     </linearGradient>
     <linearGradient id="bnBlusa" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#5E8E90"/><stop offset="100%" stop-color="#3C6466"/>
+      <stop offset="0%" stop-color="#629496"/><stop offset="100%" stop-color="#3D686A"/>
     </linearGradient>
     <radialGradient id="bnBochecha">
-      <stop offset="0%" stop-color="#F0908A" stop-opacity=".8"/>
-      <stop offset="100%" stop-color="#F0908A" stop-opacity="0"/>
+      <stop offset="0%" stop-color="#F3948D" stop-opacity=".72"/>
+      <stop offset="100%" stop-color="#F3948D" stop-opacity="0"/>
     </radialGradient>
   </defs>
 
   <g class="bn">
-    <path d="M92 120 h16 v18 q-8 6 -16 0 z" fill="#D89F78"/>
-    <path d="M28 200 L28 170 C28 140 60 116 100 116 C140 116 172 140 172 170 L172 200 Z" fill="url(#bnBlusa)"/>
-    <path d="M82 134 Q100 150 118 134 Q100 143 82 134 Z" fill="#2F5254" opacity=".5"/>
-    <ellipse class="bn-braco e" cx="44" cy="186" rx="9" ry="13" fill="#4F7A7C"/>
-    <ellipse class="bn-braco d" cx="156" cy="186" rx="9" ry="13" fill="#4F7A7C"/>
+    <path d="M93 110 h14 v18 q-7 5 -14 0 z" fill="#DDA37C"/>
+    <path d="M50 200 L50 172 C50 140 70 116 100 116 C130 116 150 140 150 172 L150 200 Z" fill="url(#bnBlusa)"/>
+    <path d="M86 124 Q100 140 114 124 Q100 133 86 124 Z" fill="#2F5254" opacity=".45"/>
+    <ellipse class="bn-braco e" cx="55" cy="184" rx="8" ry="12" fill="#4F7A7C"/>
+    <ellipse class="bn-braco d" cx="145" cy="184" rx="8" ry="12" fill="#4F7A7C"/>
 
     <g class="bn-cabeca">
       <g class="bn-fio e">
-        <path d="M44 88 C40 32 68 28 100 28 L100 96 L66 96 C64 108 62 140 68 172
-                 C66 180 54 182 48 176 C42 158 38 132 44 88 Z" fill="url(#bnCabelo)"/>
+        <path d="M56 86 C52 34 76 26 100 26 L100 96 L73 96
+                 C71 112 70 142 75 170 C73 179 63 181 58 175
+                 C53 154 50 128 56 86 Z" fill="url(#bnCabelo)"/>
       </g>
       <g class="bn-fio d">
-        <path d="M100 28 C132 28 160 32 156 88 C162 132 158 158 152 176
-                 C146 182 134 180 132 172 C138 140 136 108 134 96 L100 96 Z" fill="url(#bnCabelo)"/>
+        <path d="M100 26 C124 26 148 34 144 86 C150 128 147 154 142 175
+                 C137 181 127 179 125 170 C130 142 129 112 127 96 L100 96 Z" fill="url(#bnCabelo)"/>
       </g>
 
-      <ellipse cx="100" cy="86" rx="50" ry="47" fill="#F4CBA8"/>
+      <ellipse cx="100" cy="84" rx="42" ry="45" fill="#F6CFAD"/>
 
-      <path d="M50 84 C50 40 72 32 100 32 C128 32 150 40 150 84
-               C150 66 132 58 112 57 C96 64 70 64 50 84 Z" fill="url(#bnCabelo)"/>
-      <path d="M72 46 C86 38 106 38 120 44" stroke="#7A5232" stroke-width="5" fill="none"
-            stroke-linecap="round" opacity=".32"/>
+      <path d="M58 84 C58 40 76 30 100 30 C124 30 142 40 142 84
+               C142 66 128 60 110 59 C96 66 74 67 58 84 Z" fill="url(#bnCabelo)"/>
+      <path d="M76 44 C88 37 106 37 118 42" stroke="#7E5535" stroke-width="4.5" fill="none"
+            stroke-linecap="round" opacity=".3"/>
 
-      <ellipse class="bn-blush" cx="68" cy="100" rx="14" ry="9" fill="url(#bnBochecha)"/>
-      <ellipse class="bn-blush" cx="132" cy="100" rx="14" ry="9" fill="url(#bnBochecha)"/>
+      <ellipse class="bn-blush" cx="74" cy="99" rx="12" ry="7.5" fill="url(#bnBochecha)"/>
+      <ellipse class="bn-blush" cx="126" cy="99" rx="12" ry="7.5" fill="url(#bnBochecha)"/>
 
-      <g fill="#C4885C" opacity=".6">
-        <circle cx="90" cy="99" r="1.3"/><circle cx="96" cy="103" r="1.1"/><circle cx="104" cy="103" r="1.1"/>
-        <circle cx="110" cy="99" r="1.3"/><circle cx="100" cy="107" r="1"/>
-        <circle cx="73" cy="97" r="1.2"/><circle cx="67" cy="103" r="1.1"/><circle cx="77" cy="105" r="1"/>
-        <circle cx="127" cy="97" r="1.2"/><circle cx="133" cy="103" r="1.1"/><circle cx="123" cy="105" r="1"/>
+      <g fill="#C78C60" opacity=".55">
+        <circle cx="93" cy="98" r="1.1"/><circle cx="98" cy="101" r="1"/><circle cx="102" cy="101" r="1"/>
+        <circle cx="107" cy="98" r="1.1"/>
+        <circle cx="79" cy="97" r="1"/><circle cx="74" cy="101" r=".95"/><circle cx="83" cy="102" r=".85"/>
+        <circle cx="121" cy="97" r="1"/><circle cx="126" cy="101" r=".95"/><circle cx="117" cy="102" r=".85"/>
       </g>
 
-      <path class="bn-brow e" d="M64 72 Q74 66 84 71" stroke="#3A2416" stroke-width="3.2" fill="none" stroke-linecap="round"/>
-      <path class="bn-brow d" d="M116 71 Q126 66 136 72" stroke="#3A2416" stroke-width="3.2" fill="none" stroke-linecap="round"/>
+      <path class="bn-brow e" d="M74 70 Q82 64 91 69" stroke="#4A2E1C" stroke-width="2.8" fill="none" stroke-linecap="round"/>
+      <path class="bn-brow d" d="M109 69 Q118 64 126 70" stroke="#4A2E1C" stroke-width="2.8" fill="none" stroke-linecap="round"/>
 
       <g class="bn-olho e">
-        <ellipse cx="76" cy="90" rx="11.5" ry="14" fill="#2A1A12"/>
-        <circle cx="80" cy="84" r="4.4" fill="#fff"/>
-        <circle cx="71.5" cy="95" r="2.2" fill="#fff" opacity=".85"/>
+        <ellipse cx="84" cy="90" rx="10" ry="12.5" fill="#2A1A12"/>
+        <circle cx="87.5" cy="84.5" r="4.1" fill="#fff"/>
+        <circle cx="80.5" cy="94.5" r="2" fill="#fff" opacity=".85"/>
+        <path d="M73 83 L70 80" stroke="#2A1A12" stroke-width="2" stroke-linecap="round"/>
       </g>
       <g class="bn-olho d">
-        <ellipse cx="124" cy="90" rx="11.5" ry="14" fill="#2A1A12"/>
-        <circle cx="128" cy="84" r="4.4" fill="#fff"/>
-        <circle cx="119.5" cy="95" r="2.2" fill="#fff" opacity=".85"/>
+        <ellipse cx="116" cy="90" rx="10" ry="12.5" fill="#2A1A12"/>
+        <circle cx="119.5" cy="84.5" r="4.1" fill="#fff"/>
+        <circle cx="112.5" cy="94.5" r="2" fill="#fff" opacity=".85"/>
+        <path d="M127 83 L130 80" stroke="#2A1A12" stroke-width="2" stroke-linecap="round"/>
       </g>
 
-      <path d="M98 105 Q100 108 102 105" stroke="#D49A70" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+      <path d="M99 103 Q100 106 101.5 103" stroke="#D8A177" stroke-width="2" fill="none" stroke-linecap="round"/>
       <path id="bnBoca" class="bn-boca" d="${BOCAS.fechada}" fill="#8E3C45"/>
     </g>
   </g>
