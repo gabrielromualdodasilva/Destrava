@@ -13,6 +13,8 @@ const GEMINI = "https://generativelanguage.googleapis.com/v1beta/models";
 // de liberacao, e o navegador dele bloqueia a leitura.
 const ORIGENS = new Set([
   "https://destravaingles.pages.dev",        // Cloudflare Pages
+  "https://destrava-ingles.web.app",         // Firebase Hosting
+  "https://destrava-ingles.firebaseapp.com",
   "https://destravaingles.web.app",          // Firebase Hosting
   "https://destravaingles.firebaseapp.com",
   "https://destrava.pages.dev",
