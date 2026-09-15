@@ -149,13 +149,13 @@
 
   /* Larissa dando o recado na trilha */
   .recado{
-    display:flex; gap:14px; align-items:center;
+    display:flex; flex-direction:row-reverse; gap:14px; align-items:center;
     background:var(--surface); border-radius:var(--r); padding:14px 16px;
     box-shadow:var(--shadow);
   }
   .recado .palco{flex:0 0 auto}
   .recado .palco .halo{width:88px}
-  .recado .texto{display:flex; flex-direction:column; gap:6px; min-width:0}
+  .recado .texto{display:flex; flex-direction:column; gap:6px; min-width:0; flex:1}
   .recado .fala{font-family:var(--serif); font-size:17px; line-height:1.35; text-wrap:balance}
   .recado .acoes{display:flex; gap:8px; flex-wrap:wrap}
   @media (min-width:640px){ .recado .palco .halo{width:104px} }
@@ -356,9 +356,10 @@
 
   /* lado a lado no desktop, empilhado no celular */
   .comLarissa{display:grid; gap:18px; grid-template-columns:1fr; align-items:start}
+  .comLarissa .palco{order:-1}          /* no celular ela vem por cima */
   @media (min-width:860px){
-    .comLarissa{grid-template-columns:250px 1fr}
-    .comLarissa .palco{position:sticky; top:calc(env(safe-area-inset-top, 0px) + 74px)}
+    .comLarissa{grid-template-columns:1fr 250px}
+    .comLarissa .palco{order:0; position:sticky; top:calc(env(safe-area-inset-top, 0px) + 74px)}
     .palco .halo{width:100%}
   }
 
@@ -651,7 +652,8 @@ const byId = id => licoes().find(l => l.id === id);
 const NOVO = () => ({
   feitas:{}, xp:0, streak:{n:0, dia:null}, erros:[], falados:{}, v:1, em:0,
 });
-const CFG_NOVO = () => ({chave:"", modelo:"gemini-flash-lite-latest", voz:"", vozPT:"", taxa:0.92});
+const CFG_NOVO = () => ({chave:"", modelo:"gemini-flash-lite-latest", voz:"", vozPT:"",
+  taxa:0.92, vozIA:"Kore", natural:true});
 
 let S = NOVO(), CFG = CFG_NOVO();
 let LS = "destrava.estado.v1", LS_CFG = "destrava.cfg.v1";
@@ -962,7 +964,9 @@ function carregarVozesPT(){
   catch(e){ vozesPT = []; }
 }
 
-function falarPT(texto){
+function falarPT(texto){ dizer(texto, () => falarPTaparelho(texto)); }
+
+function falarPTaparelho(texto){
   if(!window.speechSynthesis || !texto) return;
   try{
     speechSynthesis.cancel();
@@ -1006,7 +1010,95 @@ function palmas(n){
   }catch(e){}
 }
 
-function falar(texto, taxa){
+/* A voz do Gemini e a mesma em portugues e em ingles — a Larissa deixa de
+   ter dois timbres. Custa uma chamada e alguns segundos na primeira vez, por
+   isso cada frase fica guardada; repetir e instantaneo. Sem servidor ou sem
+   cota, cai na voz do aparelho, que e instantanea mas robotica. */
+
+const MODELO_TTS = "gemini-3.1-flash-tts-preview";
+const VOZES_IA = ["Kore", "Leda", "Aoede", "Callirrhoe", "Autonoe", "Despina", "Sulafat", "Zephyr"];
+
+const cacheVoz = new Map();   // texto -> URL do audio, so nesta sessao
+let tocando = null;
+
+/* O Gemini devolve PCM cru; o navegador toca WAV. Sao 44 bytes de cabecalho. */
+function pcmParaWav(pcm, taxa){
+  const n = pcm.byteLength, buf = new ArrayBuffer(44 + n), v = new DataView(buf);
+  const escrever = (o, t) => { for(let i = 0; i < t.length; i++) v.setUint8(o + i, t.charCodeAt(i)); };
+  escrever(0, "RIFF");  v.setUint32(4, 36 + n, true);
+  escrever(8, "WAVE");  escrever(12, "fmt ");
+  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, taxa, true); v.setUint32(28, taxa * 2, true);
+  v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+  escrever(36, "data"); v.setUint32(40, n, true);
+  new Uint8Array(buf, 44).set(new Uint8Array(pcm));
+  return new Blob([buf], {type:"audio/wav"});
+}
+
+async function gerarVoz(texto){
+  const r = await fetch(`${PROXY}/api/gemini/${MODELO_TTS}:generateContent`, {
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({
+      contents:[{parts:[{text: texto}]}],
+      generationConfig:{
+        responseModalities:["AUDIO"],
+        speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName: CFG.vozIA || "Kore"}}},
+      },
+    }),
+  });
+  if(!r.ok) return null;
+  const d = await r.json().catch(() => null);
+  const parte = ((d?.candidates?.[0]?.content?.parts) || []).find(p => p.inlineData);
+  if(!parte) return null;
+  const bruto = atob(parte.inlineData.data);
+  const bytes = new Uint8Array(bruto.length);
+  for(let i = 0; i < bruto.length; i++) bytes[i] = bruto.charCodeAt(i);
+  const taxa = Number((String(parte.inlineData.mimeType).match(/rate=(\d+)/) || [])[1]) || 24000;
+  return URL.createObjectURL(pcmParaWav(bytes.buffer, taxa));
+}
+
+function pararVoz(){
+  try{ tocando?.pause(); }catch(e){}
+  tocando = null;
+  try{ speechSynthesis.cancel(); }catch(e){}
+  Larissa.fala(false);
+}
+
+/* Diz o texto com a melhor voz disponivel. `reserva` e a funcao que fala
+   com a voz do aparelho, caso a do Gemini nao venha. */
+async function dizer(texto, reserva){
+  if(!texto) return;
+  pararVoz();
+  if(!SERVIDOR || CFG.natural === false) return reserva();
+
+  const chave = (CFG.vozIA || "Kore") + "|" + texto;
+  let url = cacheVoz.get(chave);
+  if(!url){
+    const antes = Larissa.estado;
+    if(antes === "parada") Larissa.pensa(true);
+    try{ url = await gerarVoz(texto); }catch(e){ url = null; }
+    if(Larissa.estado === "pensando") Larissa.vai(antes);
+    if(!url) return reserva();                    // sem cota ou sem rede
+    if(cacheVoz.size > 40){                       // nao guarda a sessao inteira
+      const velha = cacheVoz.keys().next().value;
+      try{ URL.revokeObjectURL(cacheVoz.get(velha)); }catch(e){}
+      cacheVoz.delete(velha);
+    }
+    cacheVoz.set(chave, url);
+  }
+  try{
+    const a = new Audio(url);
+    tocando = a;
+    a.onplay = () => Larissa.fala(true);
+    a.onended = () => { Larissa.fala(false); tocando = null; };
+    a.onerror = () => { Larissa.fala(false); tocando = null; reserva(); };
+    await a.play();
+  }catch(e){ reserva(); }
+}
+
+function falar(texto, taxa){ dizer(texto, () => falarAparelho(texto, taxa)); }
+
+function falarAparelho(texto, taxa){
   if(!window.speechSynthesis || !texto) return;
   try{
     speechSynthesis.cancel();
@@ -1575,7 +1667,9 @@ function verFalar(){
     h("button", {"aria-pressed": sub === "conversa", onclick:() => { sub = "conversa"; rotear(); }}, "Conversa"),
     h("button", {"aria-pressed": sub === "pronuncia", onclick:() => { sub = "pronuncia"; rotear(); }}, "Pronúncia"));
   const corpo = sub === "conversa" ? painelConversa() : painelPronuncia();
-  pintar(seg, h("div", {class:"comLarissa"}, palco(), h("div", {}, corpo)));
+  pintar(h("div", {class:"comLarissa"},
+    h("div", {class:"stack"}, seg, corpo),
+    palco()));
 }
 
 let turnos = [];
@@ -2059,8 +2153,30 @@ function verAjustes(){
       h("button", {class:"btn", style:"align-self:flex-start", onclick:() => {
         CFG.voz = voz.value; CFG.taxa = Number(taxa.value); gravarCfg();
         falar(L().saudacao, CFG.taxa);
-      }}, "🔊 Testar esta voz"),
-      h("label", {for:"vozpt", style:"font-size:13.5px; font-weight:600; margin-top:4px"}, "Voz das dicas em português"),
+      }}, "🔊 Testar a voz do aparelho"),
+      h("div", {class:"note"}, h("span", {}, "🎙️"),
+        h("span", {}, h("b", {}, "Voz natural do Gemini. "),
+          "A mesma voz nos dois idiomas, bem mais natural que a do aparelho. Leva alguns segundos na primeira vez que ouve cada frase; depois é instantâneo.")),
+      h("div", {class:"seg", style:"max-width:340px"},
+        h("button", {"aria-pressed": CFG.natural !== false,
+          onclick:() => { CFG.natural = true; gravarCfg(); rotear(); }}, "Voz natural"),
+        h("button", {"aria-pressed": CFG.natural === false,
+          onclick:() => { CFG.natural = false; gravarCfg(); rotear(); }}, "Voz do aparelho")),
+      CFG.natural !== false
+        ? h("div", {class:"stack-s", style:"gap:6px"},
+            h("label", {for:"vozia", style:"font-size:13.5px; font-weight:600"}, "Qual voz"),
+            (() => {
+              const sel = h("select", {class:"inp", id:"vozia"},
+                ...VOZES_IA.map(v => h("option", {value:v, selected: (CFG.vozIA||"Kore") === v ? true : null}, v)));
+              sel.addEventListener("change", () => { CFG.vozIA = sel.value; gravarCfg(); });
+              return sel;
+            })(),
+            h("button", {class:"btn sm", style:"align-self:flex-start",
+              onclick:() => falarPT("Oi! Sou a Larissa. Vamos estudar juntos hoje?")}, "🔊 Testar esta voz"))
+        : null,
+
+      h("span", {class:"eyebrow", style:"margin-top:8px"}, "Reserva: voz do aparelho"),
+      h("label", {for:"vozpt", style:"font-size:13.5px; font-weight:600"}, "Voz das dicas em português"),
       (() => {
         if(!vozesPT.length) carregarVozesPT();
         const sel = h("select", {class:"inp", id:"vozpt"},
