@@ -1147,22 +1147,33 @@ const ICO = {
   trilha:'<path d="M4 19V5M4 8h9l-1.5 2.5L13 13H4"/><circle cx="4" cy="20" r="1.4" fill="currentColor" stroke="none"/>',
   falar:'<path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>',
   prog:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+  alunos:'<path d="M16 20v-1a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v1"/><circle cx="9" cy="7" r="4"/><path d="M22 20v-1a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/>',
   ajus:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 7.9 19.4l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.6 1.6 0 0 0 3 15.9a2 2 0 1 1 0-4 1.6 1.6 0 0 0 1.1-2.7l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.6 1.6 0 0 0 10 4.6V4a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 2.7 1.1l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0 1.1 2.7H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/>',
   som:'<path d="M11 5 6 9H3v6h3l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/>',
   check:'<path d="M4 12l5 5L20 6"/>',
 };
 const svg = d => h("span", {html:`<svg viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`}).firstChild;
 
-const ABAS = [
+/* Lista so para decidir se a aba aparece. Quem manda de verdade e o
+   servidor, que confere o mesmo no Worker antes de criar ou apagar. */
+const ADMINS_UI = new Set([
+  "gabriel.silva@tmtlog.com",
+  "gabriel.silva.tmt@gmail.com",
+  "admin@destrava.app",
+]);
+const ehAdmin = () => ADMINS_UI.has((EMAIL || "").toLowerCase());
+
+const abas = () => [
   {k:"trilha", r:"Trilha", i:ICO.trilha},
   {k:"falar",  r:"Falar",  i:ICO.falar},
   {k:"prog",   r:"Progresso", i:ICO.prog},
+  ...(ehAdmin() ? [{k:"alunos", r:"Alunos", i:ICO.alunos}] : []),
   {k:"ajustes",r:"Ajustes", i:ICO.ajus},
 ];
 let aba = "trilha", sub = "conversa", licaoAberta = null;
 
 function pintarNav(){
-  $("nav").replaceChildren(...ABAS.map(a =>
+  $("nav").replaceChildren(...abas().map(a =>
     h("button", {"aria-current": aba === a.k ? "page" : null,
       onclick:() => { aba = a.k; licaoAberta = null; rotear(); }},
       svg(a.i), h("span", {}, a.r))));
@@ -1183,6 +1194,7 @@ function pintarTopo(){
 function rotear(){
   pintarNav();
   if(aba === "ajustes") return verAjustes();
+  if(aba === "alunos")  return ehAdmin() ? verAlunos() : (aba = "trilha", rotear());
   if(!temChave()) return verSetup();
   if(aba === "trilha") return licaoAberta ? verLicao(licaoAberta) : verTrilha();
   if(aba === "falar")  return verFalar();
@@ -1710,6 +1722,107 @@ Explique o que provavelmente saiu errado na pronúncia dessas palavras e como co
   }catch(e){
     btn.disabled = false; btn.textContent = msgErro(e) || "Tentar de novo";
   }
+}
+
+/* ---------- Alunos (administrador) ---------- */
+
+async function apiAlunos(metodo, corpo){
+  let t = null;
+  try{ t = await AUTH?.currentUser?.getIdToken?.(); }catch(e){}
+  if(!t) throw new Error("Sua sessão expirou. Saia e entre de novo.");
+  const cab = {"Authorization": "Bearer " + t};
+  if(corpo) cab["content-type"] = "application/json";
+  const r = await fetch(`${PROXY}/api/alunos`, {
+    method: metodo, headers: cab,
+    body: corpo ? JSON.stringify(corpo) : undefined,
+  });
+  const d = await r.json().catch(() => ({}));
+  if(!r.ok) throw new Error(d.erro || "Não consegui falar com o servidor.");
+  return d;
+}
+
+const quando = ms => {
+  if(!ms) return "nunca entrou";
+  const d = new Date(ms), h = new Date();
+  const dia = d.toLocaleDateString("pt-BR", {day:"2-digit", month:"2-digit"});
+  const hora = d.toLocaleTimeString("pt-BR", {hour:"2-digit", minute:"2-digit"});
+  return d.toDateString() === h.toDateString() ? `hoje às ${hora}` : `${dia} às ${hora}`;
+};
+
+function verAlunos(){
+  const email = h("input", {class:"inp", type:"email", id:"novo-email", placeholder:"email@do-aluno.com",
+    autocapitalize:"none", autocorrect:"off", spellcheck:"false"});
+  const senha = h("input", {class:"inp", type:"text", id:"nova-senha", placeholder:"senha de pelo menos 6 letras",
+    autocapitalize:"none", autocorrect:"off", spellcheck:"false"});
+  const recado = h("p", {class:"lead", hidden:true});
+  const lista = h("div", {class:"panel"}, h("div", {class:"empty"}, h("span", {class:"spin"})));
+
+  function avisar(txt, ruim){
+    recado.textContent = txt;
+    recado.style.color = ruim ? "var(--bad)" : "var(--good)";
+    recado.hidden = !txt;
+  }
+
+  async function carregar(){
+    try{
+      const {alunos} = await apiAlunos("GET");
+      lista.replaceChildren(...(alunos.length ? alunos.map(linha) : [
+        h("div", {class:"empty"}, "Nenhuma conta ainda.")]));
+    }catch(e){
+      lista.replaceChildren(h("div", {class:"note"}, h("span", {}, "⚠️"), h("span", {}, e.message)));
+    }
+  }
+
+  const linha = a => h("div", {class:"mistake", style:"gap:4px"},
+    h("div", {class:"row", style:"justify-content:space-between; gap:8px"},
+      h("span", {style:"font-weight:600; font-size:14.5px; word-break:break-all"}, a.email),
+      a.admin ? h("span", {class:"chip", style:"background:var(--accent-soft); color:var(--accent); border-color:transparent"}, "admin") : null),
+    h("span", {class:"tip"}, `Último acesso: ${quando(a.ultimoAcesso)} · criada em ${quando(a.criadoEm)}`),
+    a.admin ? null : h("button", {class:"btn ghost sm", style:"align-self:flex-start; margin-left:-10px; color:var(--bad)",
+      onclick: async ev => {
+        if(!confirm(`Apagar a conta de ${a.email}? O progresso dela continua no banco, mas a pessoa perde o acesso.`)) return;
+        ev.target.disabled = true; ev.target.textContent = "Apagando…";
+        try{ await apiAlunos("DELETE", {uid: a.uid}); avisar(`Conta de ${a.email} apagada.`, false); carregar(); }
+        catch(e){ avisar(e.message, true); ev.target.disabled = false; ev.target.textContent = "Apagar acesso"; }
+      }}, "Apagar acesso"));
+
+  const criar = h("button", {class:"btn primary", onclick: async () => {
+    const e = email.value.trim(), p = senha.value;
+    criar.disabled = true; criar.replaceChildren(h("span", {class:"spin"}), document.createTextNode(" Criando…"));
+    try{
+      await apiAlunos("POST", {email:e, senha:p});
+      avisar(`Conta criada para ${e}. Passe o e-mail e a senha para a pessoa.`, false);
+      email.value = ""; senha.value = "";
+      carregar();
+    }catch(err){ avisar(err.message, true); }
+    finally{ criar.disabled = false; criar.textContent = "Criar acesso"; }
+  }}, "Criar acesso");
+
+  const sugerir = h("button", {class:"btn sm", onclick:() => {
+    // senha legivel, facil de ditar por telefone
+    const s = "abcdefghjkmnpqrstuvwxyz", n = "23456789";
+    let v = "";
+    for(let i = 0; i < 4; i++) v += s[Math.floor(Math.random()*s.length)];
+    for(let i = 0; i < 3; i++) v += n[Math.floor(Math.random()*n.length)];
+    senha.value = v; senha.focus();
+  }}, "Sugerir senha");
+
+  carregar();
+
+  pintar(
+    h("h2", {}, "Alunos"),
+    h("p", {class:"lead"}, "Só quem tem conta entra no Destrava. Crie aqui o acesso de cada pessoa e entregue o e-mail e a senha para ela."),
+    h("div", {class:"panel lift stack-s"},
+      h("span", {class:"eyebrow"}, "Novo acesso"),
+      email,
+      h("div", {class:"row", style:"flex-wrap:nowrap"}, senha, sugerir),
+      recado,
+      criar),
+    h("span", {class:"eyebrow"}, "Quem tem acesso"),
+    lista,
+    h("div", {class:"note"}, h("span", {}, "🔐"),
+      h("span", {}, h("b", {}, "Por que só você vê isto: "),
+        "criar conta exige credencial de administrador, que fica no servidor e nunca chega ao navegador. Mesmo que alguém force esta tela, o servidor recusa.")));
 }
 
 /* ---------- Progresso ---------- */

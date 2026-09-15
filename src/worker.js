@@ -1,25 +1,36 @@
-/* Destrava — a portinha da API.
+/* Destrava — a portinha de tras.
 
-   A pagina mora no Firebase (destravaingles.web.app). Este Worker existe
-   so para guardar a chave do Gemini: ele recebe a chamada da pagina,
-   acrescenta a chave a partir do segredo do Cloudflare e repassa ao
-   Google. A chave nunca chega ao navegador nem ao repositorio.
+   Duas responsabilidades, ambas por um motivo so: guardar credencial fora
+   do navegador.
 
-   O endereco deste Worker e encanamento — ninguem o ve. */
+   1. GEMINI_KEY — a chave do Gemini. A pagina chama /api/gemini/... aqui,
+      e a chave e acrescentada deste lado.
+   2. SA_JSON — a conta de servico do Firebase. Permite criar e apagar
+      alunos, que o navegador nao pode fazer desde que o auto-cadastro foi
+      desativado. Quem chama precisa provar que e administrador. */
 
 const GEMINI = "https://generativelanguage.googleapis.com/v1beta/models";
+const IDT = "https://identitytoolkit.googleapis.com/v1";
+const PROJETO = "destravaapp";
 
-// Quem pode chamar. Qualquer outro site recebe a resposta sem o cabecalho
-// de liberacao, e o navegador dele bloqueia a leitura.
-const ORIGENS = new Set([
-  "https://destravalinguas.web.app",          // endereco oficial
-  "https://destravalinguas.firebaseapp.com",
-  "https://destravaapp.web.app",              // site antigo do mesmo projeto
+// Chave web do Firebase: publica por natureza, ja vai no HTML da pagina.
+// Identifica o projeto, nao autoriza nada sozinha.
+const CHAVE_WEB = "AIzaSyCPbpiqSsHqzrdGnw5RG0_i_Q85ThWQGeM";
+
+// Quem pode criar e apagar alunos. Conferido no servidor, nunca no cliente.
+const ADMINS = new Set([
+  "gabriel.silva@tmtlog.com",
+  "gabriel.silva.tmt@gmail.com",
+  "admin@destrava.app",
 ]);
 
-// So estes dois metodos, e so nomes de modelo plausiveis: o caminho vem do
-// cliente, entao e tratado como entrada nao confiavel.
-const ROTA_OK = /^[A-Za-z0-9._-]{1,64}:(generateContent|streamGenerateContent)$/;
+const ORIGENS = new Set([
+  "https://destravalinguas.web.app",
+  "https://destravalinguas.firebaseapp.com",
+  "https://destravaapp.web.app",
+]);
+
+const ROTA_IA = /^[A-Za-z0-9._-]{1,64}:(generateContent|streamGenerateContent)$/;
 
 function liberar(origin) {
   const h = new Headers();
@@ -30,55 +41,187 @@ function liberar(origin) {
   return h;
 }
 
+const json = (dados, status, headers) => {
+  const h = new Headers(headers);
+  h.set("content-type", "application/json");
+  return new Response(JSON.stringify(dados), { status: status || 200, headers: h });
+};
+
+/* ---------------------------------------------------------------- conta de servico */
+
+const b64url = buf =>
+  btoa(String.fromCharCode(...new Uint8Array(buf)))
+    .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+
+let tokenCache = { valor: null, expira: 0 };
+
+async function tokenAdmin(env) {
+  const agora = Math.floor(Date.now() / 1000);
+  if (tokenCache.valor && tokenCache.expira > agora + 60) return tokenCache.valor;
+
+  const sa = JSON.parse(env.SA_JSON);
+  const enc = new TextEncoder();
+  const cabecalho = b64url(enc.encode(JSON.stringify({ alg: "RS256", typ: "JWT" })));
+  const corpo = b64url(enc.encode(JSON.stringify({
+    iss: sa.client_email,
+    scope: "https://www.googleapis.com/auth/cloud-platform",
+    aud: sa.token_uri,
+    iat: agora,
+    exp: agora + 3600,
+  })));
+
+  const pem = sa.private_key.replace(/-----[^-]+-----/g, "").replace(/\s+/g, "");
+  const der = Uint8Array.from(atob(pem), c => c.charCodeAt(0));
+  const chave = await crypto.subtle.importKey(
+    "pkcs8", der, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["sign"],
+  );
+  const assinatura = await crypto.subtle.sign(
+    "RSASSA-PKCS1-v1_5", chave, enc.encode(cabecalho + "." + corpo),
+  );
+  const jwt = `${cabecalho}.${corpo}.${b64url(assinatura)}`;
+
+  const r = await fetch(sa.token_uri, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+      assertion: jwt,
+    }),
+  });
+  const d = await r.json();
+  if (!d.access_token) throw new Error("sem token de administrador");
+  tokenCache = { valor: d.access_token, expira: agora + (d.expires_in || 3600) };
+  return d.access_token;
+}
+
+/* Quem esta chamando? O navegador manda o proprio token do Firebase; o
+   Google confere se ele e valido e diz de quem e. */
+async function quemChama(request) {
+  const auth = request.headers.get("Authorization") || "";
+  if (!auth.startsWith("Bearer ")) return null;
+  try {
+    const r = await fetch(`${IDT}/accounts:lookup?key=${CHAVE_WEB}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ idToken: auth.slice(7) }),
+    });
+    if (!r.ok) return null;
+    const d = await r.json();
+    return (d.users && d.users[0]) || null;
+  } catch (e) { return null; }
+}
+
+async function chamaAdmin(env, caminho, metodo, corpo) {
+  const t = await tokenAdmin(env);
+  const r = await fetch(`${IDT}/projects/${PROJETO}${caminho}`, {
+    method: metodo,
+    headers: { authorization: `Bearer ${t}`, "content-type": "application/json" },
+    body: corpo ? JSON.stringify(corpo) : undefined,
+  });
+  const d = await r.json().catch(() => ({}));
+  return { ok: r.ok, status: r.status, d };
+}
+
+/* ---------------------------------------------------------------- alunos */
+
+async function alunos(request, env, livre) {
+  if (!env.SA_JSON)
+    return json({ erro: "O servidor não tem credencial de administrador." }, 503, livre);
+
+  const quem = await quemChama(request);
+  if (!quem) return json({ erro: "Faça login de novo." }, 401, livre);
+  if (!ADMINS.has((quem.email || "").toLowerCase()))
+    return json({ erro: "Só o administrador pode gerenciar alunos." }, 403, livre);
+
+  if (request.method === "GET") {
+    const { ok, d } = await chamaAdmin(env, "/accounts:batchGet?maxResults=200", "GET");
+    if (!ok) return json({ erro: "Não consegui listar." }, 502, livre);
+    const lista = (d.users || []).map(u => ({
+      uid: u.localId,
+      email: u.email || "",
+      criadoEm: Number(u.createdAt) || 0,
+      ultimoAcesso: Number(u.lastLoginAt) || 0,
+      desativado: !!u.disabled,
+      admin: ADMINS.has((u.email || "").toLowerCase()),
+    })).sort((a, b) => b.criadoEm - a.criadoEm);
+    return json({ alunos: lista }, 200, livre);
+  }
+
+  if (request.method === "POST") {
+    const b = await request.json().catch(() => ({}));
+    const email = String(b.email || "").trim().toLowerCase();
+    const senha = String(b.senha || "");
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))
+      return json({ erro: "E-mail inválido." }, 400, livre);
+    if (senha.length < 6)
+      return json({ erro: "A senha precisa de pelo menos 6 caracteres." }, 400, livre);
+
+    const { ok, d } = await chamaAdmin(env, "/accounts", "POST",
+      { email, password: senha, emailVerified: false });
+    if (!ok) {
+      const m = (d.error && d.error.message) || "";
+      if (/EMAIL_EXISTS/.test(m)) return json({ erro: "Esse e-mail já tem conta." }, 409, livre);
+      return json({ erro: "Não consegui criar: " + m.slice(0, 80) }, 502, livre);
+    }
+    return json({ uid: d.localId, email }, 201, livre);
+  }
+
+  if (request.method === "DELETE") {
+    const b = await request.json().catch(() => ({}));
+    const uid = String(b.uid || "");
+    if (!uid) return json({ erro: "Falta o identificador." }, 400, livre);
+    if (uid === quem.localId)
+      return json({ erro: "Você não pode apagar a própria conta." }, 400, livre);
+    const { ok } = await chamaAdmin(env, "/accounts:delete", "POST", { localId: uid });
+    if (!ok) return json({ erro: "Não consegui apagar." }, 502, livre);
+    return json({ ok: true }, 200, livre);
+  }
+
+  return new Response("Método não suportado.", { status: 405, headers: livre });
+}
+
+/* ---------------------------------------------------------------- entrada */
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    const origin = request.headers.get("Origin");
-    const livre = liberar(origin);
+    const livre = liberar(request.headers.get("Origin"));
 
-    // O navegador pergunta antes de mandar JSON para outro dominio.
     if (request.method === "OPTIONS") {
-      livre.set("access-control-allow-methods", "POST, GET, OPTIONS");
-      livre.set("access-control-allow-headers", "content-type");
+      livre.set("access-control-allow-methods", "GET, POST, DELETE, OPTIONS");
+      livre.set("access-control-allow-headers", "content-type, authorization");
       livre.set("access-control-max-age", "86400");
       return new Response(null, { status: 204, headers: livre });
     }
 
     if (url.pathname === "/api/status") {
-      livre.set("content-type", "application/json");
       livre.set("cache-control", "no-store");
-      return new Response(JSON.stringify({ chave: Boolean(env.GEMINI_KEY) }), { headers: livre });
+      return json({ chave: Boolean(env.GEMINI_KEY), admin: Boolean(env.SA_JSON) }, 200, livre);
     }
 
-    // Quais modelos esta chave pode usar. O Google aposenta modelo sem
-    // aviso, entao a lista vem dele, nao de uma constante no codigo.
+    if (url.pathname === "/api/alunos") return alunos(request, env, livre);
+
+    // Quais modelos esta chave pode usar. O Google aposenta modelo sem aviso,
+    // entao a lista vem dele, nao de uma constante no codigo.
     if (url.pathname === "/api/models") {
-      if (!env.GEMINI_KEY) return new Response("[]", { status: 503, headers: livre });
+      if (!env.GEMINI_KEY) return json([], 503, livre);
       const r = await fetch(`${GEMINI}?key=${env.GEMINI_KEY}&pageSize=200`);
       const d = await r.json().catch(() => ({}));
       const lista = (d.models || [])
         .filter(m => (m.supportedGenerationMethods || []).includes("generateContent"))
         .map(m => ({ id: String(m.name || "").replace("models/", ""), nome: m.displayName || "" }));
-      livre.set("content-type", "application/json");
       livre.set("cache-control", "max-age=3600");
-      return new Response(JSON.stringify(lista), { status: r.status, headers: livre });
+      return json(lista, r.status, livre);
     }
 
     if (url.pathname.startsWith("/api/gemini/")) {
       if (request.method !== "POST")
         return new Response("Use POST.", { status: 405, headers: livre });
-
-      if (!env.GEMINI_KEY) {
-        livre.set("content-type", "application/json");
-        return new Response(
-          JSON.stringify({ error: { message: "O servidor não tem GEMINI_KEY configurada." } }),
-          { status: 503, headers: livre },
-        );
-      }
+      if (!env.GEMINI_KEY)
+        return json({ error: { message: "O servidor não tem GEMINI_KEY configurada." } }, 503, livre);
 
       const alvo = url.pathname.slice("/api/gemini/".length);
-      if (!ROTA_OK.test(alvo))
-        return new Response("Rota inválida.", { status: 400, headers: livre });
+      if (!ROTA_IA.test(alvo)) return new Response("Rota inválida.", { status: 400, headers: livre });
 
       const destino = new URL(`${GEMINI}/${alvo}`);
       if (url.searchParams.get("alt") === "sse") destino.searchParams.set("alt", "sse");
