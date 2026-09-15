@@ -121,7 +121,7 @@
     #view > *{width:100%; max-width:770px; align-self:center}
     #view > .mods, #view > .comLarissa, #view > .recado{max-width:none}
     /* ela fica ao lado dos dois blocos, entao cabe bem maior */
-    .recado .palco, .recado .palco .halo{width:300px}
+    .recado .palco, .recado .palco .halo{width:330px}
     .recado{gap:22px}
     .mods{display:grid; grid-template-columns:1fr 1fr; gap:4px 40px; align-items:start}
     .mods .mod:nth-child(-n+2){margin-top:12px}
@@ -166,12 +166,12 @@
     border-left:10px solid var(--surface);
   }
   .recado .texto{display:flex; flex-direction:column; gap:8px; min-width:0}
-  .recado .palco{width:182px; gap:0}
-  .recado .palco .halo{width:182px}
+  .recado .palco{width:224px; gap:0}
+  .recado .palco .halo{width:224px}
   .recado .palco .legenda{display:none}
   @media (max-width:640px){
     .recado{grid-template-columns:1fr 118px; gap:6px; align-items:start}
-    .recado .palco, .recado .palco .halo{width:118px}
+    .recado .palco, .recado .palco .halo{width:126px}
     .recado .balao::after{display:none}
   }
   .recado .fala{font-family:var(--serif); font-size:17px; line-height:1.35; text-wrap:balance}
@@ -320,12 +320,12 @@
   /* ---------- Larissa ---------- */
   .palco{position:relative; display:flex; flex-direction:column; align-items:center; gap:10px}
   .palco .halo{
-    position:relative; width:min(64vw, 260px); aspect-ratio:1;
+    position:relative; width:min(64vw, 300px); aspect-ratio:148/184;
     overflow:visible; background:none;
   }
   /* brilho difuso no lugar da moldura: ela fica solta na pagina */
   .palco .halo::before{
-    content:""; position:absolute; inset:6% 4% 14% 4%; border-radius:50%;
+    content:""; position:absolute; inset:2% -12% 10% -12%; border-radius:50%;
     background:radial-gradient(circle at 50% 42%, var(--accent-soft), transparent 68%);
     opacity:.7; transition:opacity .35s ease;
   }
@@ -398,7 +398,7 @@
   .comLarissa{display:grid; gap:18px; grid-template-columns:1fr; align-items:start}
   .comLarissa .palco{order:-1}          /* no celular ela vem por cima */
   @media (min-width:860px){
-    .comLarissa{grid-template-columns:1fr 280px}
+    .comLarissa{grid-template-columns:1fr 310px}
     .comLarissa .palco{order:0; position:sticky; top:calc(env(safe-area-inset-top, 0px) + 74px)}
     .palco .halo{width:100%}
   }
@@ -1329,7 +1329,7 @@ const BOCAS = {
 
 function avatarLarissa(){
   const svg = `
-<svg viewBox="0 0 200 200" role="img" aria-label="Larissa, sua professora">
+<svg viewBox="26 16 148 184" role="img" aria-label="Larissa, sua professora">
   <defs>
     <linearGradient id="bnCabelo" x1=".2" y1="0" x2=".7" y2="1">
       <stop offset="0%" stop-color="#3D2618"/><stop offset="100%" stop-color="#1C110A"/>
