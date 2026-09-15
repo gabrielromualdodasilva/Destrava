@@ -1,6 +1,11 @@
-# Larissa
+# Destrava
 
-Professora de inglês por voz, movida a Gemini. Um arquivo só: `index.html`.
+Aprenda inglês do zero falando. **Destrava** é o site; **Larissa** é a
+professora dentro dele — ela conversa com você em inglês, corrige sua
+pronúncia e explica em português. Movida a Gemini. Um arquivo só:
+`index.html`, sem build, sem dependências.
+
+No ar em <https://destravaingles.pages.dev>
 
 A trilha de 42 lições segue a sequência gramatical do **Inglês do Jerry 3.0**.
 As frases do treino de pronúncia "ISP" são as do **Mairo Vergara 4.0**.
@@ -24,26 +29,29 @@ Dê dois cliques em `index.html`. Abre no navegador e já funciona.
 Use o **Chrome**. O microfone depende da API de reconhecimento de voz, que o
 Chrome tem e o Firefox não. No Safari do iPhone ela existe mas falha bastante.
 
-## 3. Colocar no celular
+## 3. Onde o site fica
 
-O arquivo precisa estar numa URL para virar app de celular. Escolha um:
+**<https://destravaingles.pages.dev>** — Cloudflare Pages ligado neste
+repositório: todo `git push` na `main` republica o site sozinho.
 
-**Netlify Drop** (mais rápido, sem conta)
-1. Abra <https://app.netlify.com/drop>
-2. Arraste a pasta `Larissa` inteira para a página
-3. Ele devolve um endereço tipo `https://algo-aleatorio.netlify.app`
+Espelho no GitHub Pages: <https://gabrielromualdodasilva.github.io/Destrava/>
 
-**Cloudflare Pages** (grátis, endereço fixo)
-1. <https://pages.cloudflare.com> › Create › Upload assets
-2. Arraste a pasta, dê um nome
+Para reconectar o Cloudflare do zero:
 
-Depois, no celular: abra o endereço no Chrome › menu › **Adicionar à tela
-inicial**. Vira um ícone e abre em tela cheia, sem barra de navegador.
+1. [pages.cloudflare.com](https://pages.cloudflare.com) › **Create a project**
+2. **Connect to Git** › autorize o GitHub › escolha **Destrava**
+3. **Project name**: `destravaingles` — é ele que vira o endereço
+4. Build command e output directory: **deixe os dois vazios**. É um HTML na
+   raiz, não tem o que compilar
+5. **Save and Deploy**
 
-> O endereço fica público para quem souber dele. Como sua chave está dentro da
-> página, não divulgue o link. Se quiser publicar de verdade, restrinja a chave
-> por site (HTTP referrer) no Google Cloud Console, ou coloque um Cloudflare
-> Worker na frente para escondê-la.
+No celular: abra o endereço no Chrome › menu › **Adicionar à tela inicial**.
+Vira um ícone e abre em tela cheia, sem barra de navegador.
+
+> Sua chave do Gemini **não** está neste repositório — ela fica guardada no
+> navegador de cada aparelho. Quem abrir o endereço cai na tela pedindo a
+> chave dele, que é o comportamento certo. Se algum dia você embutir a sua no
+> código, restrinja-a por site (HTTP referrer) no Google Cloud Console.
 
 ## 4. Voz feminina
 
