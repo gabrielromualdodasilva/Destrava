@@ -248,8 +248,42 @@
   <main id="view" class="stack" style="padding-top:18px"></main>
 </div>
 
+<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-auth-compat.js"></script>
 <script>
 "use strict";
+
+/* ============================ 0. ACESSO ============================
+   Firebase Authentication. Quem entra e quando aparece no console do
+   Firebase, em Authentication › Users. As contas sao criadas por la — nao
+   ha cadastro aberto nesta tela, de proposito. */
+
+const FB = {
+  "projectId": "destravaapp",
+  "appId": "1:316173636111:web:5f3dffa928b118e053497a",
+  "storageBucket": "destravaapp.firebasestorage.app",
+  "apiKey": "AIzaSyCPbpiqSsHqzrdGnw5RG0_i_Q85ThWQGeM",
+  "authDomain": "destravaapp.firebaseapp.com",
+  "messagingSenderId": "316173636111",
+  "projectNumber": "316173636111",
+  "version": "2"
+};
+
+let AUTH = null, UID = null, EMAIL = null;
+
+const ERRO_AUTH = {
+  "auth/invalid-email": "E-mail inválido.",
+  "auth/missing-password": "Digite sua senha.",
+  "auth/user-not-found": "E-mail ou senha incorretos.",
+  "auth/wrong-password": "E-mail ou senha incorretos.",
+  "auth/invalid-credential": "E-mail ou senha incorretos.",
+  "auth/user-disabled": "Este acesso foi desativado.",
+  "auth/too-many-requests": "Muitas tentativas seguidas. Espere alguns minutos.",
+  "auth/network-request-failed": "Sem conexão com a internet.",
+  "auth/configuration-not-found": "O login ainda não foi ativado no Firebase. Vá em Authentication › Sign-in method e habilite E-mail/senha.",
+  "auth/operation-not-allowed": "O login por e-mail e senha não está habilitado no Firebase.",
+};
+const msgAuth = e => ERRO_AUTH[e?.code] || "Não consegui entrar agora. Tente de novo.";
 
 /* ============================ 1. CONTEÚDO ============================
    A trilha segue a sequência gramatical do "Inglês do Jerry 3.0"
@@ -378,15 +412,15 @@ const NOVO = () => ({
 const CFG_NOVO = () => ({chave:"", modelo:"gemini-2.5-flash", voz:"", taxa:0.92});
 
 let S = NOVO(), CFG = CFG_NOVO();
-const LS = "destrava.estado.v1", LS_CFG = "destrava.cfg.v1";
-const LS_VELHO = {"destrava.estado.v1":"larissa.estado.v1", "destrava.cfg.v1":"larissa.cfg.v1"};
+let LS = "destrava.estado.v1", LS_CFG = "destrava.cfg.v1";
 
 const hoje = () => new Date().toISOString().slice(0,10);
 const ontem = () => { const d = new Date(); d.setDate(d.getDate()-1); return d.toISOString().slice(0,10); };
 
-function ler(chave, padrao){
-  // Aceita o nome antigo da chave para não perder progresso de quem já usava.
-  for(const k of [chave, LS_VELHO[chave]]){
+function ler(chave, padrao, alternativas){
+  // Tenta a chave do usuário e, se ainda não existir, os nomes anteriores —
+  // assim ninguém perde o progresso feito antes do login existir.
+  for(const k of [chave, ...(alternativas || [])]){
     if(!k) continue;
     try{ const r = localStorage.getItem(k); if(r) return Object.assign(padrao(), JSON.parse(r)); }catch(e){}
   }
@@ -1347,6 +1381,12 @@ function verAjustes(){
         salvo)),
 
     h("div", {class:"panel stack-s"},
+      h("span", {class:"eyebrow"}, "Sua conta"),
+      h("p", {class:"lead"}, EMAIL || "—"),
+      h("button", {class:"btn", style:"align-self:flex-start",
+        onclick:() => { try{ AUTH?.signOut(); }catch(e){} }}, "Sair")),
+
+    h("div", {class:"panel stack-s"},
       h("span", {class:"eyebrow"}, "Seu progresso"),
       h("p", {class:"lead"}, "Fica guardado neste navegador. Para levar para outro aparelho, exporte aqui e importe lá."),
       h("div", {class:"row"},
@@ -1416,14 +1456,96 @@ function apagar(){
   S = NOVO(); gravar(); rotear();
 }
 
-/* ============================ 7. BOOT ============================ */
+/* ============================ 7. LOGIN E BOOT ============================ */
 
-S = ler(LS, NOVO);
-CFG = ler(LS_CFG, CFG_NOVO);
-if(!MODELOS.some(m => m.v === CFG.modelo)) CFG.modelo = CFG_NOVO().modelo;
-pintarTopo();
-rotear();
-sondarServidor().then(() => { if(SERVIDOR) rotear(); });
+const chips = () => document.querySelectorAll(".topbar .chip");
+
+function verLogin(aviso){
+  $("nav").hidden = true;
+  chips().forEach(c => { c.hidden = true; });
+
+  const email = h("input", {class:"inp", type:"email", id:"login-email",
+    placeholder:"seu@email.com", autocomplete:"username", autocapitalize:"none", spellcheck:"false"});
+  const senha = h("input", {class:"inp", type:"password", id:"login-senha",
+    placeholder:"sua senha", autocomplete:"current-password"});
+  const recado = h("p", {class:"lead", style:"color:var(--bad)", hidden: !aviso}, aviso || "");
+  const entrar = h("button", {class:"btn primary wide"}, "Entrar");
+
+  async function tentar(){
+    const e = email.value.trim(), p = senha.value;
+    if(!e || !p){ recado.textContent = "Preencha e-mail e senha."; recado.hidden = false; return; }
+    if(!AUTH){ recado.textContent = "O login não carregou. Recarregue a página."; recado.hidden = false; return; }
+    entrar.disabled = true; entrar.replaceChildren(h("span", {class:"spin"}), document.createTextNode(" Entrando…"));
+    try{
+      await AUTH.signInWithEmailAndPassword(e, p);   // onAuthStateChanged assume daqui
+    }catch(err){
+      recado.textContent = msgAuth(err); recado.hidden = false;
+      entrar.disabled = false; entrar.textContent = "Entrar";
+    }
+  }
+  entrar.addEventListener("click", tentar);
+  senha.addEventListener("keydown", ev => { if(ev.key === "Enter") tentar(); });
+
+  async function esqueci(){
+    const e = email.value.trim();
+    if(!e){ recado.textContent = "Escreva seu e-mail primeiro."; recado.hidden = false; return; }
+    try{
+      await AUTH.sendPasswordResetEmail(e);
+      recado.style.color = "var(--good)";
+      recado.textContent = "Enviei um link de redefinição para " + e + ".";
+      recado.hidden = false;
+    }catch(err){ recado.style.color = "var(--bad)"; recado.textContent = msgAuth(err); recado.hidden = false; }
+  }
+
+  pintar(
+    h("div", {class:"hero"},
+      h("span", {class:"eyebrow"}, "Acesso"),
+      h("h2", {}, "Entre para estudar"),
+      h("p", {class:"lead"}, "A Larissa está do outro lado. Use o e-mail e a senha que você recebeu."),
+      email, senha, recado, entrar,
+      h("button", {class:"btn ghost sm", style:"align-self:center", onclick: esqueci}, "Esqueci minha senha")),
+    h("div", {class:"note"}, h("span", {}, "🔑"),
+      h("span", {}, h("b", {}, "Sem acesso? "),
+        "As contas são criadas pelo administrador — não há cadastro aberto nesta página.")));
+}
+
+function entrarNoApp(u){
+  UID = u.uid; EMAIL = u.email || "(sem e-mail)";
+  LS = "destrava.estado.v1." + UID;
+  LS_CFG = "destrava.cfg.v1." + UID;
+  S = ler(LS, NOVO, ["destrava.estado.v1", "larissa.estado.v1"]);
+  CFG = ler(LS_CFG, CFG_NOVO, ["destrava.cfg.v1", "larissa.cfg.v1"]);
+  if(!MODELOS.some(m => m.v === CFG.modelo)) CFG.modelo = CFG_NOVO().modelo;
+
+  $("nav").hidden = false;
+  chips().forEach(c => { c.hidden = false; });
+  aba = "trilha"; licaoAberta = null; turnos = [];
+  pintarTopo();
+  rotear();
+  sondarServidor().then(() => { if(SERVIDOR) rotear(); });
+}
+
+function semAuth(){
+  pintar(h("div", {class:"panel stack-s"},
+    h("h2", {}, "Login indisponível"),
+    h("p", {class:"lead"},
+      "Não consegui carregar o Firebase Authentication. Verifique sua conexão e recarregue a página.")));
+}
+
+function iniciarAuth(){
+  if(typeof firebase === "undefined" || !firebase.auth) return semAuth();
+  try{
+    firebase.initializeApp(FB);
+    AUTH = firebase.auth();
+    AUTH.onAuthStateChanged(u => { if(u) entrarNoApp(u); else verLogin(); });
+  }catch(e){ semAuth(); }
+}
+
+$("nav").hidden = true;
+chips().forEach(c => { c.hidden = true; });
+pintar(h("div", {class:"panel", style:"display:flex; gap:10px; align-items:center"},
+  h("span", {class:"spin"}), h("span", {class:"lead"}, "Carregando…")));
+iniciarAuth();
 </script>
 </body>
 </html>
