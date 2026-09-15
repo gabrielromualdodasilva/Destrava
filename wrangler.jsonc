@@ -1,0 +1,10 @@
+{
+  // O Destrava e um site estatico: um index.html na raiz, sem build.
+  // Esta configuracao faz o Worker apenas servir os arquivos como estao.
+  "name": "destravaingles",
+  "compatibility_date": "2026-09-01",
+  "assets": {
+    "directory": ".",
+    "not_found_handling": "single-page-application"
+  }
+}
