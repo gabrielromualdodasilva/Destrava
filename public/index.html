@@ -145,6 +145,23 @@
   .cartao .info{font-size:13.5px; color:var(--ink-2)}
   .cartao .bar{width:100%; margin-top:4px}
 
+  /* Larissa dando o recado na trilha */
+  .recado{
+    display:flex; gap:14px; align-items:center;
+    background:var(--surface); border-radius:var(--r); padding:14px 16px;
+    box-shadow:var(--shadow);
+  }
+  .recado .palco{flex:0 0 auto}
+  .recado .palco .halo{width:88px}
+  .recado .texto{display:flex; flex-direction:column; gap:6px; min-width:0}
+  .recado .fala{font-family:var(--serif); font-size:17px; line-height:1.35; text-wrap:balance}
+  .recado .acoes{display:flex; gap:8px; flex-wrap:wrap}
+  @media (min-width:640px){ .recado .palco .halo{width:104px} }
+
+  .palco[data-larissa="feliz"] .halo{animation:pulinho .45s ease 2}
+  @keyframes pulinho{0%,100%{transform:translateY(0)}38%{transform:translateY(-9px)}}
+  @media (prefers-reduced-motion: reduce){ .palco[data-larissa="feliz"] .halo{animation:none} }
+
   .stack{display:flex; flex-direction:column; gap:16px}
   .stack-s{display:flex; flex-direction:column; gap:9px}
   .row{display:flex; align-items:center; gap:10px; flex-wrap:wrap}
@@ -919,7 +936,8 @@ function carregarVozes(){
 }
 if(window.speechSynthesis){
   carregarVozes();
-  speechSynthesis.addEventListener?.("voiceschanged", () => { carregarVozes(); if(aba === "ajustes") rotear(); });
+  carregarVozesPT();
+  speechSynthesis.addEventListener?.("voiceschanged", () => { carregarVozes(); carregarVozesPT(); if(aba === "ajustes") rotear(); });
 }
 
 function vozLarissa(){
@@ -935,6 +953,56 @@ function vozLarissa(){
       || vozes.find(v => casa(v) && !MASCULINAS.test(v.name))
       || vozes.find(v => !MASCULINAS.test(v.name))
       || vozes[0] || null;
+}
+
+/* A Larissa fala portugues nas dicas e o idioma da trilha nos exemplos.
+   Sao vozes diferentes do aparelho — o timbre muda entre uma coisa e outra. */
+let vozesPT = [];
+function carregarVozesPT(){
+  try{ vozesPT = (speechSynthesis.getVoices() || []).filter(v => /^pt/i.test(v.lang)); }
+  catch(e){ vozesPT = []; }
+}
+
+function falarPT(texto){
+  if(!window.speechSynthesis || !texto) return;
+  try{
+    speechSynthesis.cancel();
+    if(!vozesPT.length) carregarVozesPT();
+    const v = vozesPT.find(x => /pt[-_]BR/i.test(x.lang) && FEMININAS.test(x.name))
+           || vozesPT.find(x => FEMININAS.test(x.name))
+           || vozesPT.find(x => /pt[-_]BR/i.test(x.lang) && !MASCULINAS.test(x.name))
+           || vozesPT.find(x => !MASCULINAS.test(x.name)) || vozesPT[0];
+    if(!v) return;                       // sem voz em portugues: silencio, sem erro
+    const u = new SpeechSynthesisUtterance(texto);
+    u.voice = v; u.lang = v.lang; u.rate = 0.98; u.pitch = 1.06;
+    u.onstart = () => Larissa.fala(true);
+    u.onend = () => Larissa.fala(false);
+    u.onerror = () => Larissa.fala(false);
+    speechSynthesis.speak(u);
+  }catch(e){}
+}
+
+/* Palmas sintetizadas: um estouro curto de ruido filtrado. Evita carregar
+   arquivo de audio so para comemorar. */
+function palmas(n){
+  try{
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if(!AC) return;
+    const ctx = new AC();
+    for(let i = 0; i < n; i++){
+      const quando = ctx.currentTime + i * 0.17;
+      const dur = 0.085, amostras = Math.floor(ctx.sampleRate * dur);
+      const buf = ctx.createBuffer(1, amostras, ctx.sampleRate);
+      const d = buf.getChannelData(0);
+      for(let j = 0; j < amostras; j++) d[j] = (Math.random() * 2 - 1) * Math.pow(1 - j / amostras, 3.2);
+      const src = ctx.createBufferSource(); src.buffer = buf;
+      const f = ctx.createBiquadFilter(); f.type = "bandpass"; f.frequency.value = 1700; f.Q.value = 0.7;
+      const g = ctx.createGain(); g.gain.value = 0.18;
+      src.connect(f); f.connect(g); g.connect(ctx.destination);
+      src.start(quando);
+    }
+    setTimeout(() => { try{ ctx.close(); }catch(e){} }, 1400);
+  }catch(e){}
 }
 
 function falar(texto, taxa){
@@ -1179,7 +1247,7 @@ const Larissa = {
   fala(on){ this.vai(on ? "falando" : "parada"); },
   ouve(on){ this.vai(on ? "ouvindo" : "parada"); },
   pensa(on){ this.vai(on ? "pensando" : "parada"); },
-  comemora(){ this.vai("feliz"); },
+  comemora(bater){ this.vai("feliz"); if(bater !== false) palmas(3); },
 };
 
 function palco(mini){
@@ -1289,6 +1357,24 @@ function verSetup(){
 
 const proxima = () => licoes().find(l => !S.feitas[l.id]) || null;
 
+/* O recado muda conforme o momento: quem nunca comecou precisa de empurrao,
+   quem esta no meio precisa de ritmo, quem terminou precisa conversar. */
+function dicaDaTrilha(){
+  const feitas = Object.keys(S.feitas).length, tot = total(), p = proxima();
+  const nome = L().nome.toLowerCase();
+  if(feitas === 0)
+    return `Oi! Sou a Larissa. Vamos começar seu ${nome} pelo começo: toque em Estudar esta lição. São poucos minutos, e eu explico tudo em português.`;
+  if(!p)
+    return `Você terminou as ${tot} lições de ${nome}. Agora o que faz diferença é conversar comigo todo dia, na aba Falar.`;
+  if(S.streak.dia !== hoje())
+    return `Que bom te ver de volta. Vamos retomar em ${p.t}? Uma lição por dia já muda muito.`;
+  if(feitas >= 3 && Object.keys(S.falados).length === 0)
+    return `Você está indo bem na escrita. Que tal treinar a fala? Na aba Falar tem o treino de pronúncia — eu escuto e te digo o que ajustar.`;
+  if(S.erros.length >= 3)
+    return `Você tem ${S.erros.length} erros guardados. Em Progresso dá para treinar exatamente eles, que é o jeito mais rápido de melhorar.`;
+  return `Faltam ${tot - feitas} lições. A próxima é ${p.t} — vamos nessa?`;
+}
+
 function verTrilha(){
   const feitas = Object.keys(S.feitas).length;
   const p = proxima();
@@ -1319,7 +1405,16 @@ function verTrilha(){
       }));
   });
 
-  pintar(hero, h("div", {class:"mods"}, ...mods));
+  const dica = dicaDaTrilha();
+  const recado = h("div", {class:"recado"},
+    palco(),
+    h("div", {class:"texto"},
+      h("span", {class:"fala"}, dica),
+      h("div", {class:"acoes"},
+        h("button", {class:"btn sm", onclick:() => falarPT(dica)}, "🔊 Ouvir a Larissa"),
+        p ? h("button", {class:"btn sm primary", onclick:() => { licaoAberta = p.id; rotear(); }}, "Ir para a lição") : null)));
+
+  pintar(recado, hero, h("div", {class:"mods"}, ...mods));
 }
 
 /* ---------- Lição ----------
@@ -1438,7 +1533,7 @@ function montarLicao(l, cabeca, d){
           if(bi === certa) b.classList.add("right");
           else if(bi === oi) b.classList.add("wrong");
         });
-        if(resp[i]) Larissa.comemora(); else anotarErro(q.opcoes[oi], q.opcoes[certa], q.porque);
+        if(resp[i]) Larissa.comemora(false); else anotarErro(q.opcoes[oi], q.opcoes[certa], q.porque);
         bloco.append(h("div", {class:"why"}, q.porque || ""));
         conferir();
       }}, o));
@@ -1474,6 +1569,8 @@ function montarLicao(l, cabeca, d){
     S.feitas[l.id] = {acertos, total:exs.length, em:Date.now()};
     if(!jaFeita) ganhar(10 + acertos * 4); else gravar();
     const p = proxima();
+    if(acertos >= 4){ Larissa.comemora(); setTimeout(() => falarPT(
+      acertos === exs.length ? "Perfeito! Você gabaritou." : "Muito bem! Quase tudo certo."), 700); }
     fim.replaceChildren(
       h("div", {class:"panel lift stack-s", style:"align-items:center; text-align:center"},
         h("span", {class:"eyebrow"}, "Lição concluída"),
