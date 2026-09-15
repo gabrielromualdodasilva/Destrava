@@ -1,0 +1,7 @@
+# Logs das ferramentas — podem conter tokens de acesso. Nunca versionar.
+*-debug.log
+firebase-debug.log
+.firebase/
+node_modules/
+.wrangler/
+.dev.vars
