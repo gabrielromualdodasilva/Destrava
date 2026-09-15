@@ -3,15 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Larissa</title>
-<meta name="description" content="Professora de inglês por voz, com trilha do zero.">
+<title>Destrava</title>
+<meta name="description" content="Aprenda inglês do zero falando. A professora Larissa corrige sua pronúncia e conversa com você.">
 <meta name="theme-color" content="#0B6E75">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Larissa">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230B6E75'/%3E%3Ctext x='32' y='45' font-size='36' text-anchor='middle' fill='%23fff' font-family='Georgia,serif'%3EL%3C/text%3E%3C/svg%3E">
-<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230B6E75'/%3E%3Ctext x='32' y='45' font-size='36' text-anchor='middle' fill='%23fff' font-family='Georgia,serif'%3EL%3C/text%3E%3C/svg%3E">
+<meta name="apple-mobile-web-app-title" content="Destrava">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230B6E75'/%3E%3Ctext x='32' y='45' font-size='36' text-anchor='middle' fill='%23fff' font-family='Georgia,serif'%3ED%3C/text%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230B6E75'/%3E%3Ctext x='32' y='45' font-size='36' text-anchor='middle' fill='%23fff' font-family='Georgia,serif'%3ED%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&family=Public+Sans:wght@400;500;600;700&display=swap">
@@ -241,7 +241,7 @@
 
 <div class="shell">
   <header class="topbar">
-    <span class="brand">Lar<em>i</em>ssa</span>
+    <span class="brand">Destr<em>a</em>va</span>
     <span class="chip flame" id="streak" title="Dias seguidos estudando">0 dias</span>
     <span class="chip" id="xp">0 xp</span>
   </header>
@@ -378,13 +378,18 @@ const NOVO = () => ({
 const CFG_NOVO = () => ({chave:"", modelo:"gemini-2.5-flash", voz:"", taxa:0.92});
 
 let S = NOVO(), CFG = CFG_NOVO();
-const LS = "larissa.estado.v1", LS_CFG = "larissa.cfg.v1";
+const LS = "destrava.estado.v1", LS_CFG = "destrava.cfg.v1";
+const LS_VELHO = {"destrava.estado.v1":"larissa.estado.v1", "destrava.cfg.v1":"larissa.cfg.v1"};
 
 const hoje = () => new Date().toISOString().slice(0,10);
 const ontem = () => { const d = new Date(); d.setDate(d.getDate()-1); return d.toISOString().slice(0,10); };
 
 function ler(chave, padrao){
-  try{ const r = localStorage.getItem(chave); if(r) return Object.assign(padrao(), JSON.parse(r)); }catch(e){}
+  // Aceita o nome antigo da chave para não perder progresso de quem já usava.
+  for(const k of [chave, LS_VELHO[chave]]){
+    if(!k) continue;
+    try{ const r = localStorage.getItem(k); if(r) return Object.assign(padrao(), JSON.parse(r)); }catch(e){}
+  }
   return padrao();
 }
 function gravar(){
@@ -758,9 +763,9 @@ function verTrilha(){
    As aulas geradas ficam salvas no navegador: reabrir uma lição é instantâneo,
    funciona sem internet e não gasta cota do Gemini de novo. */
 
-const LS_AULAS = "larissa.aulas.v1";
+const LS_AULAS = "destrava.aulas.v1";
 let cacheLicao = {};
-try{ cacheLicao = JSON.parse(localStorage.getItem(LS_AULAS) || "{}") || {}; }catch(e){ cacheLicao = {}; }
+try{ cacheLicao = JSON.parse(localStorage.getItem(LS_AULAS) || localStorage.getItem("larissa.aulas.v1") || "{}") || {}; }catch(e){ cacheLicao = {}; }
 
 function guardarAula(id, d){
   cacheLicao[id] = d;
@@ -1351,7 +1356,7 @@ function exportar(){
     const blob = new Blob([JSON.stringify(S, null, 1)], {type:"application/json"});
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `larissa-progresso-${hoje()}.json`;
+    a.download = `destrava-progresso-${hoje()}.json`;
     document.body.append(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 3000);
   }catch(e){ alert("Não consegui gerar o arquivo neste navegador."); }
@@ -1367,7 +1372,7 @@ function importar(){
       S = Object.assign(NOVO(), d);
       gravar(); rotear();
       alert("Progresso importado.");
-    }catch(e){ alert("Esse arquivo não parece um backup da Larissa."); }
+    }catch(e){ alert("Esse arquivo não parece um backup do Destrava."); }
     inp.remove();
   });
   document.body.append(inp); inp.click();
