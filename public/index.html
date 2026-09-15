@@ -1002,7 +1002,7 @@ function carregarVozesPT(){
   catch(e){ vozesPT = []; }
 }
 
-function falarPT(texto){ dizer(texto, () => falarPTaparelho(texto)); }
+function falarPT(texto){ return dizer(texto, () => falarPTaparelho(texto), "pt-BR"); }
 
 function falarPTaparelho(texto){
   if(!window.speechSynthesis || !texto) return;
@@ -1110,7 +1110,7 @@ function pcmParaWav(pcm, taxa){
   return new Blob([buf], {type:"audio/wav"});
 }
 
-const VOZ_AZ_PADRAO = "pt-BR-FranciscaNeural";
+const VOZ_AZ_PADRAO = "pt-BR-ThalitaMultilingualNeural";   // fala os dois idiomas com o mesmo timbre
 let vozesAzure = null;   // carregadas do servidor na primeira vez que Ajustes abre
 
 async function listarVozesAzure(){
@@ -1124,11 +1124,11 @@ async function listarVozesAzure(){
 
 /* O Azure devolve MP3 pronto — nada de montar cabecalho. E sao 500 mil
    caracteres por mes de graca, entao nao e preciso racionar. */
-async function gerarVozAzure(texto, voz){
+async function gerarVozAzure(texto, voz, idioma){
   try{
     const r = await fetch(`${PROXY}/api/voz`, {
       method:"POST", headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({texto, voz}),
+      body: JSON.stringify({texto, voz, idioma}),
     });
     if(!r.ok) return null;
     const b = await r.blob();
@@ -1188,12 +1188,12 @@ async function aquecerVoz(texto){
   if(!AZURE && semCotaHoje) return;
   const motor = AZURE ? "az" : "gem";
   const vozAtual = AZURE ? (CFG.vozAzure || VOZ_AZ_PADRAO) : (CFG.vozIA || "Kore");
-  const chave = motor + "|" + vozAtual + "|" + texto;
+  const chave = motor + "|" + vozAtual + "|pt-BR|" + texto;
   if(cacheVoz.has(chave)) return;
   try{
     let blob = await doCofre(chave);
     if(!blob){
-      blob = AZURE ? await gerarVozAzure(texto, vozAtual) : await gerarVoz(texto);
+      blob = AZURE ? await gerarVozAzure(texto, vozAtual, "pt-BR") : await gerarVoz(texto);
       if(blob) paraCofre(chave, blob);
     }
     if(blob) cacheVoz.set(chave, URL.createObjectURL(blob));
@@ -1209,7 +1209,7 @@ function pararVoz(){
 
 /* Diz o texto com a melhor voz disponivel. `reserva` e a funcao que fala
    com a voz do aparelho, caso a do Gemini nao venha. */
-async function dizer(texto, reserva){
+async function dizer(texto, reserva, idioma){
   if(!texto) return;
   pararVoz();
   if(!SERVIDOR || CFG.natural === false) return reserva();
@@ -1217,7 +1217,8 @@ async function dizer(texto, reserva){
   // Azure primeiro: 500 mil caracteres por mes contra 10 audios por dia.
   const motor = AZURE ? "az" : "gem";
   const vozAtual = AZURE ? (CFG.vozAzure || VOZ_AZ_PADRAO) : (CFG.vozIA || "Kore");
-  const chave = motor + "|" + vozAtual + "|" + texto;
+  const lingua = idioma || L().locale;
+  const chave = motor + "|" + vozAtual + "|" + lingua + "|" + texto;
 
   let url = cacheVoz.get(chave);
   if(!url){
@@ -1227,7 +1228,7 @@ async function dizer(texto, reserva){
       const antes = Larissa.estado;
       if(antes === "parada") Larissa.pensa(true);
       try{
-        blob = AZURE ? await gerarVozAzure(texto, vozAtual) : await gerarVoz(texto);
+        blob = AZURE ? await gerarVozAzure(texto, vozAtual, lingua) : await gerarVoz(texto);
       }catch(e){ blob = null; }
       if(Larissa.estado === "pensando") Larissa.vai(antes);
       if(!blob) return reserva();                 // sem cota ou sem rede
@@ -1251,7 +1252,7 @@ async function dizer(texto, reserva){
   }catch(e){ reserva(); }
 }
 
-function falar(texto, taxa){ dizer(texto, () => falarAparelho(texto, taxa)); }
+function falar(texto, taxa){ return dizer(texto, () => falarAparelho(texto, taxa), L().locale); }
 
 function falarAparelho(texto, taxa){
   if(!window.speechSynthesis || !texto) return;

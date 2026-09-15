@@ -17,6 +17,7 @@ const PROJETO = "destravaapp";
    do Gemini. Devolve MP3 pronto, entao nao precisa montar cabecalho WAV. */
 const AZ_FORMATO = "audio-24khz-48kbitrate-mono-mp3";
 const VOZ_OK = /^[a-z]{2}-[A-Z]{2}-[A-Za-z]{2,30}Neural$/;
+const LOCALE_OK = /^[a-z]{2}-[A-Z]{2}$/;
 
 const escaparXml = t => String(t)
   .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
@@ -28,12 +29,16 @@ async function vozAzure(request, env, livre){
 
   const b = await request.json().catch(() => ({}));
   const texto = String(b.texto || "").slice(0, 1500);
-  const voz = String(b.voz || "pt-BR-FranciscaNeural");
+  const voz = String(b.voz || "pt-BR-ThalitaMultilingualNeural");
   if (!texto.trim()) return json({ erro: "Sem texto." }, 400, livre);
   if (!VOZ_OK.test(voz)) return json({ erro: "Nome de voz inválido." }, 400, livre);
 
+  /* Nas vozes multilingues o timbre e o mesmo, mas o sotaque segue o idioma
+     declarado. Por isso a pagina diz em que lingua o texto esta. */
+  const idioma = LOCALE_OK.test(String(b.idioma || "")) ? b.idioma : voz.slice(0, 5);
+
   const ssml =
-    `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="${voz.slice(0,5)}">` +
+    `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="${idioma}">` +
     `<voice name="${voz}">${escaparXml(texto)}</voice></speak>`;
 
   const r = await fetch(`https://${env.AZURE_REGION}.tts.speech.microsoft.com/cognitiveservices/v1`, {
