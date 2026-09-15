@@ -171,13 +171,12 @@
   .recado .palco .halo{width:292px}
   .recado .palco .legenda{display:none}
   @media (max-width:640px){
-    .recado{grid-template-columns:1fr 118px; gap:6px; align-items:start}
-    .recado .palco, .recado .palco .halo{width:164px}
+    .recado{grid-template-columns:1fr 128px; gap:8px; align-items:start}
+    .recado .palco, .recado .palco .halo{width:128px}
     .recado .balao::after{display:none}
   }
   .recado .fala{font-family:var(--serif); font-size:17px; line-height:1.35; text-wrap:balance}
   .recado .acoes{display:flex; gap:8px; flex-wrap:wrap}
-  @media (min-width:640px){ .recado .palco .halo{width:104px} }
 
   .palco[data-larissa="feliz"] .halo{animation:pulinho .45s ease 2}
   @keyframes pulinho{0%,100%{transform:translateY(0)}38%{transform:translateY(-9px)}}
