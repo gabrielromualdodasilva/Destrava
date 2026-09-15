@@ -416,7 +416,27 @@ function anotarErro(was, now, tip){
 
 /* ============================ 3. GEMINI ============================ */
 
-const API = "https://generativelanguage.googleapis.com/v1beta/models";
+const API_DIRETA = "https://generativelanguage.googleapis.com/v1beta/models";
+
+/* Quando o site roda no Cloudflare, o Worker guarda a chave e a pagina fala
+   com /api/gemini/... no proprio dominio. Aberto como arquivo local, cai no
+   modo antigo: a chave do proprio aparelho, direto no Google. */
+let SERVIDOR = false;
+
+function rotaIA(acao, sse){
+  const m = encodeURIComponent(CFG.modelo);
+  if(SERVIDOR) return `/api/gemini/${m}:${acao}` + (sse ? "?alt=sse" : "");
+  return `${API_DIRETA}/${m}:${acao}?` + (sse ? "alt=sse&" : "") + `key=${encodeURIComponent(CFG.chave)}`;
+}
+
+async function sondarServidor(){
+  try{
+    const r = await fetch("/api/status", {cache:"no-store"});
+    if(!r.ok) return;
+    const d = await r.json();
+    SERVIDOR = !!(d && d.chave);
+  }catch(e){}   // arquivo local, ou offline: segue no modo chave-no-aparelho
+}
 const MODELOS = [
   {v:"gemini-2.5-flash",      r:"2.5 Flash — equilibrado (recomendado)"},
   {v:"gemini-2.5-flash-lite", r:"2.5 Flash-Lite — mais barato e rápido"},
@@ -424,7 +444,7 @@ const MODELOS = [
   {v:"gemini-2.0-flash",      r:"2.0 Flash — alternativa estável"},
 ];
 
-const temChave = () => !!(CFG.chave && CFG.chave.trim());
+const temChave = () => SERVIDOR || !!(CFG.chave && CFG.chave.trim());
 const pensa25 = m => /2\.5/.test(m);
 
 function corpo({prompt, turnos, sistema, json, rapido}){
@@ -460,7 +480,7 @@ async function pedir(opts){
   if(!temChave()) throw new ErroIA("chave", "Falta a chave da API. Vá em Ajustes.");
   let r;
   try{
-    r = await fetch(`${API}/${encodeURIComponent(CFG.modelo)}:generateContent?key=${encodeURIComponent(CFG.chave)}`, {
+    r = await fetch(rotaIA("generateContent", false), {
       method:"POST", headers:{"Content-Type":"application/json"},
       body: JSON.stringify(corpo(opts)), signal: opts.signal,
     });
@@ -482,7 +502,7 @@ async function pedirStream(opts, onTexto){
   if(!temChave()) throw new ErroIA("chave", "Falta a chave da API. Vá em Ajustes.");
   let r;
   try{
-    r = await fetch(`${API}/${encodeURIComponent(CFG.modelo)}:streamGenerateContent?alt=sse&key=${encodeURIComponent(CFG.chave)}`, {
+    r = await fetch(rotaIA("streamGenerateContent", true), {
       method:"POST", headers:{"Content-Type":"application/json"},
       body: JSON.stringify(corpo(opts)), signal: opts.signal,
     });
@@ -1295,6 +1315,11 @@ function verAjustes(){
 
     h("div", {class:"panel stack-s"},
       h("span", {class:"eyebrow"}, "Conexão com o Gemini"),
+      SERVIDOR
+        ? h("div", {class:"note"}, h("span", {}, "🔒"),
+            h("span", {}, h("b", {}, "A chave está no servidor. "),
+              "Este site usa a chave guardada no Cloudflare, então você não precisa digitar nada — em nenhum aparelho. O campo abaixo fica de reserva, para o caso de o servidor ficar sem chave."))
+        : null,
       h("label", {for:"chave", style:"font-size:13.5px; font-weight:600"}, "Chave da API"),
       chave,
       h("p", {class:"lead", style:"font-size:12.5px"},
@@ -1390,6 +1415,7 @@ CFG = ler(LS_CFG, CFG_NOVO);
 if(!MODELOS.some(m => m.v === CFG.modelo)) CFG.modelo = CFG_NOVO().modelo;
 pintarTopo();
 rotear();
+sondarServidor().then(() => { if(SERVIDOR) rotear(); });
 </script>
 </body>
 </html>

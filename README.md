@@ -18,9 +18,16 @@ assuntos. As explicações e exercícios são gerados pela Larissa na hora.
 2. Entre com sua conta Google, toque em **Create API key**
 3. Copie a chave (começa com `AIza`)
 
-O app pede essa chave na primeira tela. Ela fica guardada só no navegador do
-aparelho, e vai direto do seu celular para o Google — não passa por servidor
-nenhum meu ou de terceiros.
+A chave tem dois lugares possíveis, e o app descobre sozinho qual está valendo:
+
+**No servidor (é assim que o site publicado funciona).** A chave fica como
+segredo `GEMINI_KEY` no Cloudflare. A página chama `/api/gemini/...` no próprio
+domínio e o Worker acrescenta a chave. O navegador nunca a vê, e você não
+digita chave em aparelho nenhum. Ver a seção 3.
+
+**No aparelho (abrindo o `index.html` direto do computador).** Sem servidor, o
+app cai na tela pedindo a chave e a guarda no navegador, chamando o Google
+direto.
 
 ## 2. Testar agora, no computador
 
@@ -31,27 +38,35 @@ Chrome tem e o Firefox não. No Safari do iPhone ela existe mas falha bastante.
 
 ## 3. Onde o site fica
 
-**<https://destravaingles.pages.dev>** — Cloudflare Pages ligado neste
-repositório: todo `git push` na `main` republica o site sozinho.
+**<https://destravaingles.gabriel-silva-62c.workers.dev>** — Cloudflare
+Workers, ligado neste repositório: todo `git push` na `main` republica sozinho.
 
-Espelho no GitHub Pages: <https://gabrielromualdodasilva.github.io/Destrava/>
+O `src/worker.js` serve os arquivos de `public/` e intercepta só duas rotas:
 
-Para reconectar o Cloudflare do zero:
+| Rota | O que faz |
+|---|---|
+| `/api/status` | diz à página se o servidor tem chave |
+| `/api/gemini/<modelo>:<ação>` | repassa ao Gemini com a chave do segredo |
 
-1. [pages.cloudflare.com](https://pages.cloudflare.com) › **Create a project**
-2. **Connect to Git** › autorize o GitHub › escolha **Destrava**
-3. **Project name**: `destravaingles` — é ele que vira o endereço
-4. Build command e output directory: **deixe os dois vazios**. É um HTML na
-   raiz, não tem o que compilar
-5. **Save and Deploy**
+### Configurar a chave no Cloudflare
 
-No celular: abra o endereço no Chrome › menu › **Adicionar à tela inicial**.
-Vira um ícone e abre em tela cheia, sem barra de navegador.
+Uma vez só, no painel:
 
-> Sua chave do Gemini **não** está neste repositório — ela fica guardada no
-> navegador de cada aparelho. Quem abrir o endereço cai na tela pedindo a
-> chave dele, que é o comportamento certo. Se algum dia você embutir a sua no
-> código, restrinja-a por site (HTTP referrer) no Google Cloud Console.
+1. **Compute › Workers & Pages › destravaingles**
+2. **Settings › Variables and Secrets › Add**
+3. Type: **Secret** · Name: `GEMINI_KEY` · Value: sua chave `AIza...`
+4. **Deploy**
+
+Pela linha de comando seria `npx wrangler secret put GEMINI_KEY`.
+
+O segredo fica criptografado no Cloudflare. Não está neste repositório, não
+aparece no código e não chega ao navegador — nem no seu, nem no de quem abrir
+o endereço.
+
+### No celular
+
+Abra o endereço no Chrome › menu › **Adicionar à tela inicial**. Vira ícone e
+abre em tela cheia. Com a chave no servidor, já entra funcionando.
 
 ## 4. Voz feminina
 

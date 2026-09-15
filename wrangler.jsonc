@@ -1,10 +1,12 @@
 {
-  // O Destrava e um site estatico: um index.html na raiz, sem build.
-  // Esta configuracao faz o Worker apenas servir os arquivos como estao.
+  // O site e estatico (public/), mas o Worker roda na frente para injetar
+  // a chave do Gemini a partir do segredo GEMINI_KEY. Sem build.
   "name": "destravaingles",
+  "main": "src/worker.js",
   "compatibility_date": "2026-09-01",
   "assets": {
-    "directory": ".",
-    "not_found_handling": "single-page-application"
-  }
+    "directory": "./public",
+    "binding": "ASSETS"
+  },
+  "observability": { "enabled": true }
 }
