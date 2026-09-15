@@ -129,6 +129,22 @@
   .palco.mini .halo{width:76px; flex:0 0 auto}
   .palco.mini .legenda{text-align:left; min-height:0}
 
+  .escolha{display:grid; gap:14px; grid-template-columns:1fr}
+  @media (min-width:640px){ .escolha{grid-template-columns:1fr 1fr} }
+  .cartao{
+    background:var(--surface); border:1.5px solid var(--line); border-radius:var(--r);
+    padding:22px 18px; display:flex; flex-direction:column; gap:8px; align-items:flex-start;
+    text-align:left; color:inherit; transition:border-color .2s ease, transform .2s ease;
+  }
+  .cartao:hover{border-color:var(--accent); transform:translateY(-2px)}
+  .cartao .sigla{
+    font-family:var(--mono); font-size:12px; font-weight:600; letter-spacing:.1em;
+    color:var(--accent); background:var(--accent-soft); padding:3px 9px; border-radius:999px;
+  }
+  .cartao .nome{font-family:var(--serif); font-size:26px; font-weight:600; letter-spacing:-.015em}
+  .cartao .info{font-size:13.5px; color:var(--ink-2)}
+  .cartao .bar{width:100%; margin-top:4px}
+
   .stack{display:flex; flex-direction:column; gap:16px}
   .stack-s{display:flex; flex-direction:column; gap:9px}
   .row{display:flex; align-items:center; gap:10px; flex-wrap:wrap}
@@ -250,10 +266,12 @@
   /* Personagem original, inspirada no estilo: cabelo escuro longo e ondulado,
      pele quente, sardinhas, blusa azul-acinzentada. Nao e retrato de ninguem. */
   :root{
-    --pele:#E9BE9B; --pele-c:#F3D4B6; --pele-s:#CE9B72;
-    --cabelo:#2B1A11; --cabelo-m:#462C1B; --cabelo-luz:#6E4527;
-    --boca:#C86F73; --boca-i:#8E3C45; --blush:#E08F86; --iris:#5A3A1E;
-    --sarda:#BC8055; --blusa:#5E7181; --blusa-c:#47596A;
+    --pele:#EFC5A2; --pele-c:#F8D9BC; --pele-s:#D6A177;
+    --cabelo:#3E2719; --cabelo-m:#5A3A24; --cabelo-luz:#96693F;
+    --cilios:#2A1A10;
+    --boca:#D08286; --boca-i:#8C3F47; --blush:#EE9C90;
+    --iris:#6B4423; --iris-e:#3D2311; --iris-c:#A9773F;
+    --sarda:#C08A5E; --blusa:#67798A; --blusa-c:#4E6072;
   }
 
   .palco{
@@ -306,6 +324,9 @@
   .lz-blush{opacity:.34; transition:opacity .4s ease}
   .palco[data-larissa="feliz"] .lz-blush{opacity:.95}
   .lz-boca{transition:d .09s linear, transform .25s ease}
+  .lz-dentes{opacity:0; transition:opacity .15s ease}
+  .palco[data-larissa="falando"] .lz-dentes,
+  .palco[data-larissa="feliz"] .lz-dentes{opacity:1}
 
   /* bolinhas de "pensando" */
   .lz-pensa{opacity:0; transition:opacity .3s ease}
@@ -973,30 +994,35 @@ function alinhar(alvo, ouvido){
    fonetica de verdade, e ritmo, que e o que o olho le como fala. */
 
 const BOCAS = {
-  fechada: "M95 131 Q100 132 105 131 Q100 132 95 131",
-  leve:    "M91 130 Q100 136 109 130 Q100 134 91 130",
-  media:   "M89 129 Q100 141 111 129 Q100 136 89 129",
-  larga:   "M87 128 Q100 147 113 128 Q100 138 87 128",
-  o:       "M95 129 Q100 125 105 129 Q105 140 100 142 Q95 140 95 129",
-  sorriso: "M87 129 Q100 143 113 129 Q100 135 87 129",
+  fechada: "M88 127 C92 132 108 132 112 127 C108 130 92 130 88 127 Z",
+  leve:    "M86 125 C92 136 108 136 114 125 C108 130 92 130 86 125 Z",
+  media:   "M84 124 C90 141 110 141 116 124 C110 129 90 129 84 124 Z",
+  larga:   "M82 123 C89 147 111 147 118 123 C111 128 89 128 82 123 Z",
+  o:       "M93 125 C93 121 107 121 107 125 C107 137 103 142 100 142 C97 142 93 137 93 125 Z",
+  sorriso: "M81 123 C88 145 112 145 119 123 C112 129 88 129 81 123 Z",
 };
 
 function avatarLarissa(){
   const svg = `
 <svg viewBox="0 0 200 200" role="img" aria-label="Larissa, sua professora">
   <defs>
-    <radialGradient id="lzPele" cx="50%" cy="34%" r="70%">
+    <radialGradient id="lzPele" cx="50%" cy="34%" r="78%">
       <stop offset="0%" stop-color="var(--pele-c)"/>
       <stop offset="100%" stop-color="var(--pele)"/>
     </radialGradient>
     <radialGradient id="lzBlush">
-      <stop offset="0%" stop-color="var(--blush)" stop-opacity=".62"/>
-      <stop offset="70%" stop-color="var(--blush)" stop-opacity=".18"/>
+      <stop offset="0%" stop-color="var(--blush)" stop-opacity=".58"/>
+      <stop offset="68%" stop-color="var(--blush)" stop-opacity=".16"/>
       <stop offset="100%" stop-color="var(--blush)" stop-opacity="0"/>
     </radialGradient>
-    <linearGradient id="lzCabelo" x1="0" y1="0" x2="0.35" y2="1">
-      <stop offset="0%" stop-color="var(--cabelo)"/>
-      <stop offset="74%" stop-color="var(--cabelo)"/>
+    <linearGradient id="lzIris" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="var(--iris-e)"/>
+      <stop offset="55%" stop-color="var(--iris)"/>
+      <stop offset="100%" stop-color="var(--iris-c)"/>
+    </linearGradient>
+    <linearGradient id="lzCabelo" x1="0.15" y1="0" x2="0.6" y2="1">
+      <stop offset="0%" stop-color="var(--cabelo-m)"/>
+      <stop offset="45%" stop-color="var(--cabelo)"/>
       <stop offset="100%" stop-color="var(--cabelo-m)"/>
     </linearGradient>
     <linearGradient id="lzBlusa" x1="0" y1="0" x2="0" y2="1">
@@ -1004,103 +1030,98 @@ function avatarLarissa(){
       <stop offset="100%" stop-color="var(--blusa)"/>
     </linearGradient>
     <clipPath id="lzRosto">
-      <path d="M59 98 C59 64 76 49 100 49 C124 49 141 64 141 98
-               C141 123 126 148 100 150 C74 148 59 123 59 98 Z"/>
+      <path d="M60 96 C60 64 77 50 100 50 C123 50 140 64 140 96
+               C140 119 127 142 100 147 C73 142 60 119 60 96 Z"/>
     </clipPath>
   </defs>
 
   <g class="lz-corpo">
-    <!-- pescoco -->
-    <path d="M89 131 h22 v22 q-11 8 -22 0 z" fill="var(--pele-s)"/>
-    <!-- ombros -->
-    <path d="M20 200 C24 162 40 145 62 139 L138 139 C160 145 176 162 180 200 Z" fill="url(#lzBlusa)"/>
-    <path d="M78 140 L122 140 C122 154 112 163 100 163 C88 163 78 154 78 140 Z" fill="var(--blusa-c)" opacity=".5"/>
+    <path d="M90 128 h20 v18 q-10 8 -20 0 z" fill="var(--pele-s)"/>
+    <path d="M16 200 C20 156 36 136 56 130 L144 130 C164 136 180 156 184 200 Z" fill="url(#lzBlusa)"/>
+    <path d="M76 131 L124 131 C124 148 113 158 100 158 C87 158 76 148 76 131 Z" fill="var(--blusa-c)" opacity=".4"/>
 
     <g class="lz-cabeca">
-      <!-- cabelo de tras, com onda nas pontas -->
-      <path d="M52 108 C48 60 72 40 100 40 C128 40 152 60 148 108
-               C152 132 149 150 156 174 C159 186 153 195 151 200
-               L119 200 C128 174 134 148 136 118
-               C138 90 122 76 100 76 C78 76 62 90 64 118
-               C66 148 72 174 81 200 L49 200
-               C47 195 41 186 44 174 C51 150 48 132 52 108 Z" fill="url(#lzCabelo)"/>
+      <!-- cabelo de tras -->
+      <path d="M53 106 C49 58 73 38 100 38 C127 38 151 58 147 106
+               C151 130 148 150 155 174 C158 186 152 195 150 200
+               L118 200 C127 173 133 147 135 116
+               C137 88 121 74 100 74 C79 74 63 88 65 116
+               C67 147 73 173 82 200 L50 200
+               C48 195 42 186 45 174 C52 150 49 130 53 106 Z" fill="url(#lzCabelo)"/>
+      <path d="M144 118 C150 152 146 178 149 196" stroke="var(--cabelo-luz)" stroke-width="3.6"
+            fill="none" opacity=".45" stroke-linecap="round"/>
+      <path d="M57 120 C51 152 55 178 52 196" stroke="var(--cabelo-luz)" stroke-width="3"
+            fill="none" opacity=".38" stroke-linecap="round"/>
 
-      <!-- orelhas -->
-      <ellipse cx="60" cy="102" rx="6" ry="9" fill="var(--pele-s)"/>
-      <ellipse cx="140" cy="102" rx="6" ry="9" fill="var(--pele-s)"/>
+      <ellipse cx="60" cy="100" rx="5.5" ry="8.5" fill="var(--pele-s)"/>
+      <ellipse cx="140" cy="100" rx="5.5" ry="8.5" fill="var(--pele-s)"/>
 
       <!-- rosto -->
-      <path d="M59 98 C59 64 76 49 100 49 C124 49 141 64 141 98
-               C141 123 126 148 100 150 C74 148 59 123 59 98 Z" fill="url(#lzPele)"/>
+      <path d="M60 96 C60 64 77 50 100 50 C123 50 140 64 140 96
+               C140 119 127 142 100 147 C73 142 60 119 60 96 Z" fill="url(#lzPele)"/>
 
-      <!-- franja repartida de lado -->
+      <!-- franja em mechas, repartida de lado -->
       <g clip-path="url(#lzRosto)">
-        <path d="M57 104 C55 66 75 46 103 46 C113 46 119 50 122 55
-                 C110 59 90 66 76 82 C66 93 60 99 57 104 Z" fill="var(--cabelo)"/>
-        <path d="M122 55 C136 57 146 72 145 102 C141 80 133 68 119 62 Z" fill="var(--cabelo)"/>
-        <path d="M104 47 C92 52 78 62 68 78 C78 60 92 50 104 47 Z" fill="var(--cabelo-luz)" opacity=".4"/>
+        <path d="M58 100 C56 62 76 44 104 44 C119 44 128 49 132 57
+                 C119 59 96 63 84 74 C72 86 63 94 58 100 Z" fill="var(--cabelo)"/>
+        <path d="M124 50 C141 54 148 72 147 100 C143 76 134 62 116 56 Z" fill="var(--cabelo)"/>
+        <path d="M58 100 C64 88 74 76 88 66 C78 80 68 92 62 104 Z" fill="var(--cabelo-m)" opacity=".7"/>
+        <path d="M100 47 C89 53 78 63 70 76 C79 60 90 51 100 47 Z" fill="var(--cabelo-luz)" opacity=".35"/>
       </g>
 
-      <!-- sobrancelhas: finas, com ponta -->
-      <path class="lz-brow e" d="M71 87 C77 82 87 82 92 86" stroke="var(--cabelo)"
-            stroke-width="2.9" fill="none" stroke-linecap="round"/>
-      <path class="lz-brow d" d="M108 86 C113 82 123 82 129 87" stroke="var(--cabelo)"
-            stroke-width="2.9" fill="none" stroke-linecap="round"/>
+      <!-- sobrancelhas suaves -->
+      <path class="lz-brow e" d="M66 85 C72 80 83 80 89 84" stroke="var(--cabelo-m)"
+            stroke-width="2.6" fill="none" stroke-linecap="round"/>
+      <path class="lz-brow d" d="M111 84 C117 80 128 80 134 85" stroke="var(--cabelo-m)"
+            stroke-width="2.6" fill="none" stroke-linecap="round"/>
 
-      <!-- olhos amendoados -->
+      <!-- olhos grandes, o traco do estilo -->
       <g>
-        <path d="M70 100 C75 92 89 92 94 100 C89 107 75 107 70 100 Z" fill="#FDFBF8"/>
-        <path d="M106 100 C111 92 125 92 130 100 C125 107 111 107 106 100 Z" fill="#FDFBF8"/>
+        <path d="M65 106 C67 93 73 87 80 87 C85 89 93 93 93 104 C93 114 87 119 80 119 C71 121 67 114 67 104 Z" fill="#FFFDF9"/>
+        <path d="M109 106 C107 93 113 87 120 87 C129 89 133 93 133 104 C133 114 127 119 120 119 C115 121 107 114 107 104 Z" fill="#FFFDF9"/>
         <g class="lz-pupilas">
-          <circle cx="82" cy="100" r="4.8" fill="var(--iris)"/>
-          <circle cx="118" cy="100" r="4.8" fill="var(--iris)"/>
-          <circle cx="82" cy="100" r="2.1" fill="#180E06"/>
-          <circle cx="118" cy="100" r="2.1" fill="#180E06"/>
-          <circle cx="84" cy="98" r="1.5" fill="#fff" opacity=".92"/>
-          <circle cx="120" cy="98" r="1.5" fill="#fff" opacity=".92"/>
+          <circle cx="78" cy="106" r="11" fill="url(#lzIris)"/>
+          <circle cx="122" cy="106" r="11" fill="url(#lzIris)"/>
+          <circle cx="78" cy="107" r="5" fill="#1C0F06"/>
+          <circle cx="122" cy="107" r="5" fill="#1C0F06"/>
+          <circle cx="73" cy="101" r="2.7" fill="#fff"/>
+          <circle cx="117" cy="101" r="2.7" fill="#fff"/>
+          <circle cx="83" cy="112" r="1.7" fill="#fff" opacity=".8"/>
+          <circle cx="127" cy="112" r="1.7" fill="#fff" opacity=".8"/>
         </g>
-        <!-- linha de cilios -->
-        <path d="M70 100 C75 91 89 91 94 100" stroke="var(--cabelo)" stroke-width="2.4"
-              fill="none" stroke-linecap="round"/>
-        <path d="M106 100 C111 91 125 91 130 100" stroke="var(--cabelo)" stroke-width="2.4"
-              fill="none" stroke-linecap="round"/>
-        <path class="lz-palpebra a" d="M69 99 C74 90 90 90 95 99 C90 107 74 107 69 99 Z" fill="var(--pele)"/>
-        <path class="lz-palpebra b" d="M105 99 C110 90 126 90 131 99 C126 107 110 107 105 99 Z" fill="var(--pele)"/>
+        <path d="M64 103 C66 92 71 87 78 87 C85 87 90 92 92 103" stroke="var(--cilios)"
+              stroke-width="3.6" fill="none" stroke-linecap="round"/>
+        <path d="M108 103 C110 92 115 87 122 87 C129 87 134 92 136 103" stroke="var(--cilios)"
+              stroke-width="3.6" fill="none" stroke-linecap="round"/>
+        <path class="lz-palpebra a" d="M64 104 C66 91 71 86 78 86 C85 86 90 91 92 104 C90 118 66 118 64 104 Z" fill="var(--pele)"/>
+        <path class="lz-palpebra b" d="M108 104 C110 91 115 86 122 86 C129 86 134 91 136 104 C134 118 110 118 108 104 Z" fill="var(--pele)"/>
       </g>
 
-      <!-- nariz -->
-      <path d="M100 104 C97 112 96 116 99 118 C101 119 103 118 104 117"
-            stroke="var(--pele-s)" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+      <!-- nariz minimo -->
+      <path d="M99 114 C101 117 103 117 104 116" stroke="var(--pele-s)" stroke-width="2"
+            fill="none" stroke-linecap="round" opacity=".85"/>
 
-      <!-- bochechas difusas -->
-      <ellipse class="lz-blush" cx="74" cy="116" rx="13" ry="9" fill="url(#lzBlush)"/>
-      <ellipse class="lz-blush" cx="126" cy="116" rx="13" ry="9" fill="url(#lzBlush)"/>
+      <ellipse class="lz-blush" cx="73" cy="118" rx="13" ry="8" fill="url(#lzBlush)"/>
+      <ellipse class="lz-blush" cx="127" cy="118" rx="13" ry="8" fill="url(#lzBlush)"/>
 
-      <!-- sardinhas: densas no nariz, rareando para as maças -->
       <g fill="var(--sarda)">
-        <circle cx="94" cy="110" r="1.05" opacity=".72"/><circle cx="100" cy="113" r="1.15" opacity=".78"/>
-        <circle cx="106" cy="110" r="1.05" opacity=".72"/><circle cx="97" cy="116" r=".95" opacity=".66"/>
-        <circle cx="104" cy="116" r=".95" opacity=".66"/>
-        <circle cx="86" cy="112" r="1.1" opacity=".6"/><circle cx="80" cy="115" r="1.2" opacity=".62"/>
-        <circle cx="74" cy="112" r="1.05" opacity=".5"/><circle cx="77" cy="120" r="1" opacity=".5"/>
-        <circle cx="84" cy="120" r=".9" opacity=".46"/><circle cx="70" cy="118" r=".95" opacity=".4"/>
-        <circle cx="114" cy="112" r="1.1" opacity=".6"/><circle cx="120" cy="115" r="1.2" opacity=".62"/>
-        <circle cx="126" cy="112" r="1.05" opacity=".5"/><circle cx="123" cy="120" r="1" opacity=".5"/>
-        <circle cx="116" cy="120" r=".9" opacity=".46"/><circle cx="130" cy="118" r=".95" opacity=".4"/>
+        <circle cx="94" cy="113" r=".95" opacity=".6"/><circle cx="100" cy="116" r="1.05" opacity=".66"/>
+        <circle cx="106" cy="113" r=".95" opacity=".6"/><circle cx="97" cy="119" r=".85" opacity=".54"/>
+        <circle cx="104" cy="119" r=".85" opacity=".54"/>
+        <circle cx="86" cy="115" r="1" opacity=".5"/><circle cx="80" cy="118" r="1.1" opacity=".52"/>
+        <circle cx="74" cy="115" r=".95" opacity=".42"/><circle cx="77" cy="122" r=".9" opacity=".42"/>
+        <circle cx="114" cy="115" r="1" opacity=".5"/><circle cx="120" cy="118" r="1.1" opacity=".52"/>
+        <circle cx="126" cy="115" r=".95" opacity=".42"/><circle cx="123" cy="122" r=".9" opacity=".42"/>
       </g>
 
-      <!-- labios com arco do cupido -->
-      <path d="M86 128 C89 123 94 124 100 127 C106 124 111 123 114 128
-               C110 138 104 141 100 141 C96 141 90 138 86 128 Z" fill="var(--boca)"/>
-      <path d="M86 128 C90 126 95 127 100 128 C105 127 110 126 114 128"
-            stroke="var(--boca-i)" stroke-width="1" fill="none" opacity=".55"/>
+      <!-- boca: interior escuro, dentes recortados por ela -->
       <path id="lzBoca" class="lz-boca" d="${BOCAS.fechada}" fill="var(--boca-i)"/>
+      <path class="lz-dentes" d="M84 124 C90 130 110 130 116 124 C110 127 90 127 84 124 Z" fill="#FFF7F1"/>
 
-      <!-- pensando -->
       <g class="lz-pensa">
-        <circle cx="156" cy="66" r="3.2" fill="var(--accent)"/>
-        <circle cx="167" cy="59" r="4" fill="var(--accent)"/>
-        <circle cx="180" cy="50" r="4.8" fill="var(--accent)"/>
+        <circle cx="156" cy="62" r="3.2" fill="var(--accent)"/>
+        <circle cx="167" cy="55" r="4" fill="var(--accent)"/>
+        <circle cx="180" cy="46" r="4.8" fill="var(--accent)"/>
       </g>
     </g>
   </g>
@@ -1217,8 +1238,8 @@ function pintarTopo(){
   const bt = $("idioma");
   if(bt){
     bt.textContent = L().bandeira;
-    bt.title = `Estudando ${L().nome}. Toque para trocar.`;
-    bt.onclick = () => trocarIdioma(IDIOMA === "en" ? "it" : "en");
+    bt.title = `Estudando ${L().nome}. Toque para trocar de idioma.`;
+    bt.onclick = () => verEscolha(true);
   }
   const n = S.streak.n || 0;
   $("streak").textContent = n === 1 ? "1 dia" : n + " dias";
@@ -2032,34 +2053,81 @@ function chaves(){
   LS_CFG = "destrava.cfg.v1" + base;
 }
 
-/* Cada idioma tem trilha, progresso e voz proprios. Trocar recarrega tudo. */
-function trocarIdioma(novo){
-  if(!IDIOMAS[novo] || novo === IDIOMA) return;
-  IDIOMA = novo;
-  try{ localStorage.setItem("destrava.idioma", novo); }catch(e){}
-  chaves();
-  // O ingles herda o progresso anterior a existencia do italiano.
-  S = ler(LS, NOVO, novo === "en" ? ["destrava.estado.v1." + UID, "destrava.estado.v1"] : []);
-  carregarVozes();
-  aba = "trilha"; licaoAberta = null; turnos = []; banco = "base"; idx = 0;
-  pintarTopo(); rotear(); puxarDaNuvem();
+/* A escolha do idioma e por pessoa, e fica guardada: quem ja escolheu volta
+   direto para onde parou. */
+const LS_IDIOMA = () => "destrava.idioma" + (UID && UID !== "local" ? "." + UID : "");
+
+function idiomaSalvo(){
+  try{ const v = localStorage.getItem(LS_IDIOMA()); return IDIOMAS[v] ? v : null; }
+  catch(e){ return null; }
 }
 
-function entrarNoApp(uid, email){
-  UID = uid; EMAIL = email || "(sem e-mail)";
-  try{ IDIOMA = IDIOMAS[localStorage.getItem("destrava.idioma")] ? localStorage.getItem("destrava.idioma") : "en"; }catch(e){ IDIOMA = "en"; }
+function progressoDe(k){
+  const base = UID === "local" ? "" : "." + UID;
+  try{
+    const r = localStorage.getItem("destrava.estado.v1" + base + "." + k);
+    if(!r) return 0;
+    return Object.keys(JSON.parse(r).feitas || {}).length;
+  }catch(e){ return 0; }
+}
+
+function verEscolha(podeVoltar){
+  $("nav").hidden = true;
+  chips().forEach(c => { c.hidden = true; });
+
+  const cartao = k => {
+    const d = IDIOMAS[k], feitas = progressoDe(k), tot = d.licoes.length;
+    return h("button", {class:"cartao", onclick:() => definirIdioma(k)},
+      h("span", {class:"sigla"}, d.bandeira),
+      h("span", {class:"nome"}, d.nome),
+      h("span", {class:"info"}, feitas ? `${feitas} de ${tot} lições feitas` : `${tot} lições, do zero`),
+      h("div", {class:"bar"}, h("i", {style:`width:${Math.round(100*feitas/tot)}%`})),
+      h("span", {class:"info", style:"color:var(--accent); font-weight:600"},
+        feitas ? "Continuar de onde parei ›" : "Começar ›"));
+  };
+
+  pintar(
+    h("div", {class:"stack-s", style:"text-align:center; align-items:center; padding-top:8px"},
+      h("span", {class:"eyebrow"}, "Primeiro, escolha"),
+      h("h2", {}, "O que você quer estudar?"),
+      h("p", {class:"lead"}, "A Larissa ensina os dois. Você troca quando quiser, e cada idioma guarda o próprio progresso.")),
+    h("div", {class:"escolha"}, cartao("en"), cartao("it")),
+    podeVoltar
+      ? h("button", {class:"btn ghost sm", style:"align-self:center",
+          onclick:() => { if(idiomaSalvo()) abrirApp(); }}, "‹ Voltar sem trocar")
+      : null);
+}
+
+function definirIdioma(k){
+  IDIOMA = k;
+  try{ localStorage.setItem(LS_IDIOMA(), k); }catch(e){}
+  abrirApp();
+}
+
+/* Abre o app no idioma corrente, do ponto onde a pessoa parou. */
+function abrirApp(){
   chaves();
-  S = ler(LS, NOVO, ["destrava.estado.v1." + uid, "destrava.estado.v1", "larissa.estado.v1"]);
+  // O ingles herda o progresso de antes de o italiano existir.
+  S = ler(LS, NOVO, IDIOMA === "en" ? ["destrava.estado.v1." + UID, "destrava.estado.v1", "larissa.estado.v1"] : []);
   CFG = ler(LS_CFG, CFG_NOVO, ["destrava.cfg.v1", "larissa.cfg.v1"]);
   if(!MODELOS.some(m => m.v === CFG.modelo)) CFG.modelo = CFG_NOVO().modelo;
+  carregarVozes();
 
   $("nav").hidden = false;
   chips().forEach(c => { c.hidden = false; });
-  aba = "trilha"; licaoAberta = null; turnos = [];
+  aba = "trilha"; licaoAberta = null; turnos = []; banco = "base"; idx = 0;
   pintarTopo();
   rotear();
   puxarDaNuvem();
   sondarServidor().then(() => { if(SERVIDOR) rotear(); });
+}
+
+function entrarNoApp(uid, email){
+  UID = uid; EMAIL = email || "(sem e-mail)";
+  const salvo = idiomaSalvo();
+  if(!salvo) return verEscolha(false);   // ninguem entra sem escolher
+  IDIOMA = salvo;
+  abrirApp();
 }
 
 function semAuth(){
