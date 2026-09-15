@@ -786,7 +786,7 @@ function rotear(){
 /* ---------- Primeiro uso ---------- */
 
 function verSetup(){
-  const campo = h("input", {class:"inp", type:"password", id:"chave0", placeholder:"AIza…",
+  const campo = h("input", {class:"inp", type:"password", id:"chave0", placeholder:"AQ.… ou AIza…",
     autocapitalize:"none", autocorrect:"off", spellcheck:"false"});
   const erro = h("p", {class:"lead", style:"color:var(--bad)", hidden:true});
 
@@ -802,8 +802,8 @@ function verSetup(){
       campo, erro,
       h("button", {class:"btn primary wide", onclick:() => {
         const v = campo.value.trim();
-        if(!v.startsWith("AIza") || v.length < 30){
-          erro.textContent = "Isso não parece uma chave do Google. Ela começa com AIza.";
+        if(v.length < 20 || /\s/.test(v)){
+          erro.textContent = "Cole a chave inteira, sem espaços. Ela costuma começar com AQ. ou AIza.";
           erro.hidden = false; return;
         }
         CFG.chave = v; gravarCfg(); rotear();
@@ -1346,7 +1346,7 @@ Formato: {"q":[{"pergunta":"enunciado em português","opcoes":["a","b","c"],"res
 
 function verAjustes(){
   const chave = h("input", {class:"inp", type:"password", id:"chave", value:CFG.chave,
-    placeholder:"AIza…", autocapitalize:"none", autocorrect:"off", spellcheck:"false"});
+    placeholder:"AQ.… ou AIza…", autocapitalize:"none", autocorrect:"off", spellcheck:"false"});
 
   const modelo = h("select", {class:"inp", id:"modelo"},
     ...MODELOS.map(m => h("option", {value:m.v, selected: CFG.modelo === m.v ? true : null}, m.r)));
