@@ -423,15 +423,23 @@ const API_DIRETA = "https://generativelanguage.googleapis.com/v1beta/models";
    modo antigo: a chave do proprio aparelho, direto no Google. */
 let SERVIDOR = false;
 
+/* Onde fica a portinha da API que guarda a chave. Se a propria pagina for
+   servida pelo Worker, caminho relativo; no Firebase, o endereco absoluto
+   dele. Se o subdominio da conta Cloudflare mudar um dia, e esta linha — e
+   so ela — que precisa ser corrigida. */
+const PROXY = location.hostname.endsWith(".workers.dev")
+  ? ""
+  : "https://destravaingles.gabriel-silva-62c.workers.dev";
+
 function rotaIA(acao, sse){
   const m = encodeURIComponent(CFG.modelo);
-  if(SERVIDOR) return `/api/gemini/${m}:${acao}` + (sse ? "?alt=sse" : "");
+  if(SERVIDOR) return `${PROXY}/api/gemini/${m}:${acao}` + (sse ? "?alt=sse" : "");
   return `${API_DIRETA}/${m}:${acao}?` + (sse ? "alt=sse&" : "") + `key=${encodeURIComponent(CFG.chave)}`;
 }
 
 async function sondarServidor(){
   try{
-    const r = await fetch("/api/status", {cache:"no-store"});
+    const r = await fetch(`${PROXY}/api/status`, {cache:"no-store"});
     if(!r.ok) return;
     const d = await r.json();
     SERVIDOR = !!(d && d.chave);

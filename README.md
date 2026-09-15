@@ -38,35 +38,51 @@ Chrome tem e o Firefox não. No Safari do iPhone ela existe mas falha bastante.
 
 ## 3. Onde o site fica
 
-**<https://destravaingles.gabriel-silva-62c.workers.dev>** — Cloudflare
-Workers, ligado neste repositório: todo `git push` na `main` republica sozinho.
+**<https://destravaingles.web.app>** — Firebase Hosting serve `public/`.
 
-O `src/worker.js` serve os arquivos de `public/` e intercepta só duas rotas:
+O Cloudflare Worker continua rodando, mas agora só como portinha da API: ele
+guarda a chave do Gemini e ninguém vê o endereço dele. As duas pontas:
 
-| Rota | O que faz |
-|---|---|
-| `/api/status` | diz à página se o servidor tem chave |
-| `/api/gemini/<modelo>:<ação>` | repassa ao Gemini com a chave do segredo |
+| Peça | Onde | Para quê |
+|---|---|---|
+| `public/index.html` | Firebase Hosting | o site que você abre |
+| `src/worker.js` | Cloudflare Workers | guarda a chave, fala com o Gemini |
 
-### Configurar a chave no Cloudflare
+A página chama `/api/gemini/...` no Worker; o Worker acrescenta a chave e
+repassa ao Google. A chave não está neste repositório, não aparece no código e
+não chega ao navegador.
 
-Uma vez só, no painel:
+O endereço do Worker está escrito uma vez só, na constante `PROXY` no topo do
+script de `index.html`. Se o subdomínio da conta Cloudflare mudar, é essa linha
+que se corrige — e a lista `ORIGENS` em `src/worker.js`, que diz quais sites
+podem chamá-lo.
 
-1. **Compute › Workers & Pages › destravaingles**
-2. **Settings › Variables and Secrets › Add**
-3. Type: **Secret** · Name: `GEMINI_KEY` · Value: sua chave `AIza...`
-4. **Deploy**
+### Publicar
 
-Pela linha de comando seria `npx wrangler secret put GEMINI_KEY`.
+Site (Firebase), depois de `npx firebase-tools login` uma vez:
 
-O segredo fica criptografado no Cloudflare. Não está neste repositório, não
-aparece no código e não chega ao navegador — nem no seu, nem no de quem abrir
-o endereço.
+```
+npx firebase-tools deploy --only hosting
+```
+
+API (Cloudflare): automático a cada `git push` na `main`.
+
+### Configurar a chave, uma vez só
+
+No painel do Cloudflare: **Compute › Workers & Pages › destravaingles ›
+Settings › Variables and Secrets › Add** · Type **Secret** · Name
+`GEMINI_KEY` · Value a chave `AIza...` · **Deploy**.
+
+Pela linha de comando: `npx wrangler secret put GEMINI_KEY`.
+
+Para conferir se pegou, abra
+<https://destravaingles.gabriel-silva-62c.workers.dev/api/status>: deve
+responder `{"chave":true}`.
 
 ### No celular
 
-Abra o endereço no Chrome › menu › **Adicionar à tela inicial**. Vira ícone e
-abre em tela cheia. Com a chave no servidor, já entra funcionando.
+Abra <https://destravaingles.web.app> no Chrome › menu › **Adicionar à tela
+inicial**. Vira ícone e abre em tela cheia, já funcionando.
 
 ## 4. Voz feminina
 
