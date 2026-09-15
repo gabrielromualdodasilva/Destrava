@@ -912,6 +912,7 @@ const FEMININAS = /(female|samantha|victoria|karen|moira|tessa|fiona|serena|alli
 const MASCULINAS = /(male|alex|daniel|fred|tom|thomas|guy|david|mark|james|ryan|oliver|aaron|arthur|nathan|eddy|reed|rishi)/i;
 
 let vozes = [];
+let vozesPT = [];   // declarada aqui: e usada logo abaixo, no arranque
 function carregarVozes(){
   const pre = L().locale.slice(0, 2);
   try{ vozes = (speechSynthesis.getVoices() || []).filter(v => v.lang && v.lang.toLowerCase().startsWith(pre)); }catch(e){ vozes = []; }
@@ -939,7 +940,6 @@ function vozLarissa(){
 
 /* A Larissa fala portugues nas dicas e o idioma da trilha nos exemplos.
    Sao vozes diferentes do aparelho — o timbre muda entre uma coisa e outra. */
-let vozesPT = [];
 function carregarVozesPT(){
   try{ vozesPT = (speechSynthesis.getVoices() || []).filter(v => /^pt/i.test(v.lang)); }
   catch(e){ vozesPT = []; }
