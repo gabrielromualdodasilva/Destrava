@@ -1116,7 +1116,7 @@ let vozesAzure = null;   // carregadas do servidor na primeira vez que Ajustes a
 async function listarVozesAzure(){
   if(vozesAzure) return vozesAzure;
   try{
-    const r = await fetch(`${PROXY}/api/vozes`);
+    const r = await fetch(`${PROXY}/api/vozes?v=2`);   // muda quando a ordem muda
     vozesAzure = r.ok ? await r.json() : [];
   }catch(e){ vozesAzure = []; }
   return vozesAzure;
@@ -2356,11 +2356,19 @@ function verAjustes(){
                 caixa.append(h("span", {class:"lead", style:"font-size:12.5px"}, "carregando vozes…"));
                 listarVozesAzure().then(vs => {
                   const fem = vs.filter(v => v.feminina);
-                  const escolhidas = (fem.length ? fem : vs).slice(0, 10);
+                  const base = fem.length ? fem : vs;
+                  const atual = CFG.vozAzure || VOZ_AZ_PADRAO;
+                  const escolhidas = base.slice(0, 10);
+                  // a voz em uso sempre aparece, mesmo que caia fora do corte
+                  if(!escolhidas.some(v => v.nome === atual)){
+                    const ela = base.find(v => v.nome === atual);
+                    if(ela) escolhidas.unshift(ela);
+                  }
                   caixa.replaceChildren(...escolhidas.map(v => botao(
                     v.nome,
-                    v.rotulo + (v.multilingue ? " ✦" : "") + (v.locale === "en-US" ? " (en)" : ""),
-                    (CFG.vozAzure || VOZ_AZ_PADRAO) === v.nome,
+                    v.rotulo.replace(/\s*Multilingual/i, "") + (v.multilingue ? " ✦" : "")
+                      + (v.locale === "pt-BR" ? " 🇧🇷" : " 🇺🇸"),
+                    atual === v.nome,
                     x => { CFG.vozAzure = x; })));
                   if(escolhidas.some(v => v.multilingue))
                     caixa.append(h("span", {class:"lead", style:"font-size:12px; width:100%"},

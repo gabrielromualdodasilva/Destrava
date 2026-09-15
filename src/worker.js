@@ -78,9 +78,14 @@ async function vozesAzure(env, livre){
       feminina: v.Gender === "Female",
       multilingue: /Multilingual/i.test(v.ShortName),
     }))
-    .sort((a, b) => (b.multilingue - a.multilingue) || (b.feminina - a.feminina)
-                 || a.rotulo.localeCompare(b.rotulo));
-  livre.set("cache-control", "max-age=86400");
+    // portugues primeiro: as dicas sao em portugues, e a multilingue brasileira
+    // e a que soa natural nos dois idiomas
+    .sort((a, b) =>
+      ((b.locale === "pt-BR") - (a.locale === "pt-BR")) ||
+      (b.multilingue - a.multilingue) ||
+      (b.feminina - a.feminina) ||
+      a.rotulo.localeCompare(b.rotulo));
+  livre.set("cache-control", "max-age=3600");
   return json(lista, 200, livre);
 }
 
