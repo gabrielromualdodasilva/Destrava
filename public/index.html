@@ -120,9 +120,9 @@
     .shell{max-width:1060px}
     #view > *{width:100%; max-width:770px; align-self:center}
     #view > .mods, #view > .comLarissa, #view > .recado{max-width:none}
-    /* a Larissa cresce junto com o bloco, para a proporcao nao quebrar */
-    .recado .palco, .recado .palco .halo{width:236px}
-    .recado{gap:18px}
+    /* ela fica ao lado dos dois blocos, entao cabe bem maior */
+    .recado .palco, .recado .palco .halo{width:300px}
+    .recado{gap:22px}
     .mods{display:grid; grid-template-columns:1fr 1fr; gap:4px 40px; align-items:start}
     .mods .mod:nth-child(-n+2){margin-top:12px}
   }
@@ -153,14 +153,15 @@
   /* Larissa dando o recado na trilha */
   /* A Larissa fica FORA do balao: ele carrega so a fala, e ela em pe ao
      lado, do tamanho de gente. O balao alinha pela base dela. */
-  .recado{display:grid; grid-template-columns:1fr auto; gap:10px; align-items:end}
+  .recado{display:grid; grid-template-columns:1fr auto; gap:14px; align-items:center}
+  .recado .coluna{display:flex; flex-direction:column; gap:14px; min-width:0}
   .recado .balao{
     background:var(--surface); border-radius:var(--r); padding:16px 18px;
     box-shadow:var(--shadow); position:relative;
   }
   /* bicinho do balao apontando para ela */
   .recado .balao::after{
-    content:""; position:absolute; right:-9px; bottom:26px; width:0; height:0;
+    content:""; position:absolute; right:-9px; top:38px; width:0; height:0;
     border-top:9px solid transparent; border-bottom:9px solid transparent;
     border-left:10px solid var(--surface);
   }
@@ -169,8 +170,8 @@
   .recado .palco .halo{width:182px}
   .recado .palco .legenda{display:none}
   @media (max-width:640px){
-    .recado{grid-template-columns:1fr 116px; gap:4px}
-    .recado .palco, .recado .palco .halo{width:116px}
+    .recado{grid-template-columns:1fr 118px; gap:6px; align-items:start}
+    .recado .palco, .recado .palco .halo{width:118px}
     .recado .balao::after{display:none}
   }
   .recado .fala{font-family:var(--serif); font-size:17px; line-height:1.35; text-wrap:balance}
@@ -1647,7 +1648,12 @@ function verTrilha(){
         p ? h("button", {class:"btn sm primary", onclick:() => { licaoAberta = p.id; rotear(); }}, "Ir para a lição") : null))),
     palco());
 
-  pintar(recado, hero, h("div", {class:"mods"}, ...mods));
+  // o balao e o "comece aqui" na mesma coluna: mesma largura, mesma borda
+  recado.replaceChildren(
+    h("div", {class:"coluna"}, recado.firstElementChild, hero),
+    recado.lastElementChild);
+
+  pintar(recado, h("div", {class:"mods"}, ...mods));
   // enquanto a pessoa le a trilha, a voz da dica ja vai ficando pronta
   setTimeout(() => aquecerVoz(dica), 400);
 }
