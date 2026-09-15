@@ -119,7 +119,10 @@
   @media (min-width:1180px){
     .shell{max-width:1060px}
     #view > *{width:100%; max-width:770px; align-self:center}
-    #view > .mods, #view > .comLarissa{max-width:none}
+    #view > .mods, #view > .comLarissa, #view > .recado{max-width:none}
+    /* a Larissa cresce junto com o bloco, para a proporcao nao quebrar */
+    .recado .palco, .recado .palco .halo{width:236px}
+    .recado{gap:18px}
     .mods{display:grid; grid-template-columns:1fr 1fr; gap:4px 40px; align-items:start}
     .mods .mod:nth-child(-n+2){margin-top:12px}
   }
@@ -1572,19 +1575,30 @@ const proxima = () => licoes().find(l => !S.feitas[l.id]) || null;
 
 /* O recado muda conforme o momento: quem nunca comecou precisa de empurrao,
    quem esta no meio precisa de ritmo, quem terminou precisa conversar. */
+/* A Larissa e psicologa, trabalha com criancas e esta aprendendo italiano.
+   Isso aparece nas dicas onde faz sentido — no erro, no sumico, no comeco —
+   e nao em toda frase, senao vira personagem falando de si. */
 function dicaDaTrilha(){
   const feitas = Object.keys(S.feitas).length, tot = total(), p = proxima();
   const nome = L().nome.toLowerCase();
+
   if(feitas === 0)
-    return `Oi! Sou a Larissa. Vamos começar seu ${nome} pelo começo: toque em Estudar esta lição. São poucos minutos, e eu explico tudo em português.`;
+    return IDIOMA === "it"
+      ? `Oi! Sou a Larissa. Olha, italiano eu também estou aprendendo — então vamos juntos, no mesmo passo. Comece por aqui e eu explico tudo em português.`
+      : `Oi! Sou a Larissa. Vamos começar seu ${nome} pelo começo: toque em Estudar esta lição. São poucos minutos, e eu explico tudo em português.`;
+
   if(!p)
-    return `Você terminou as ${tot} lições de ${nome}. Agora o que faz diferença é conversar comigo todo dia, na aba Falar.`;
+    return `Você terminou as ${tot} lições de ${nome}. Agora o que faz diferença é conversar comigo todo dia, na aba Falar. Sem conversa, a gramática dorme.`;
+
   if(S.streak.dia !== hoje())
-    return `Que bom te ver de volta. Vamos retomar em ${p.t}? Uma lição por dia já muda muito.`;
+    return `Que bom te ver de volta. Como psicóloga eu digo: constância vale mais que intensidade — quinze minutos hoje rendem mais que três horas no domingo. Vamos retomar em ${p.t}?`;
+
   if(feitas >= 3 && Object.keys(S.falados).length === 0)
-    return `Você está indo bem na escrita. Que tal treinar a fala? Na aba Falar tem o treino de pronúncia — eu escuto e te digo o que ajustar.`;
+    return `Você está indo bem na escrita, mas ainda não falou nada. Trabalho com crianças e elas não têm vergonha de errar em voz alta — é por isso que aprendem rápido. Vamos tentar na aba Falar?`;
+
   if(S.erros.length >= 3)
-    return `Você tem ${S.erros.length} erros guardados. Em Progresso dá para treinar exatamente eles, que é o jeito mais rápido de melhorar.`;
+    return `Você tem ${S.erros.length} erros guardados, e isso é bom sinal: só erra quem arrisca. Em Progresso dá para treinar exatamente esses.`;
+
   return `Faltam ${tot - feitas} lições. A próxima é ${p.t} — vamos nessa?`;
 }
 
@@ -1846,6 +1860,8 @@ const SISTEMA_CHAT = () => {
   const n = Object.keys(S.feitas).length;
   const nivel = n < 8 ? `bem iniciante, sabe pouquíssimo ${L().adj}` : n < 20 ? "iniciante" : n < 34 ? "intermediário baixo" : "intermediário";
   return `Você é Larissa, uma professora de ${L().adj} brasileira conversando com um aluno de nível ${nivel}. Você é calorosa, paciente e breve.
+
+Sobre você: é psicóloga e trabalha com crianças. Está aprendendo italiano, então sabe por experiência própria como é travar numa língua nova. Deixe isso aparecer de vez em quando — quando o aluno erra, quando desanima, quando some por uns dias — mas com parcimônia: uma pincelada ocasional, nunca falar de si a cada mensagem. Como psicóloga, você entende que vergonha de errar trava mais que falta de vocabulário, e trata o erro com leveza em vez de correção seca.
 
 O aluno pode escrever em ${L().adj} OU em português, e os dois são bem-vindos:
 - Se ele escrever em ${L().adj}: responda em ${L().adj} e corrija os erros dele.
@@ -2568,7 +2584,7 @@ function verLogin(aviso, semLogin){
     h("div", {class:"hero"},
       h("span", {class:"eyebrow"}, "Acesso"),
       h("h2", {}, "Entre para estudar"),
-      h("p", {class:"lead"}, "A Larissa ensina inglês e italiano. Use o e-mail e a senha que você recebeu."),
+      h("p", {class:"lead"}, "A Larissa ensina inglês e italiano — e está aprendendo italiano junto com você. Use o e-mail e a senha que você recebeu."),
       email, senha, recado, entrar,
       h("button", {class:"btn ghost sm", style:"align-self:center", onclick: esqueci}, "Esqueci minha senha")),
 
