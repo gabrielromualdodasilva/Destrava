@@ -1943,9 +1943,13 @@ function limparAulas(){
   rotear();
 }
 
-async function verLicao(id, refazer){
+/* `silencio` gera e guarda a aula sem pintar nada. E o que permite adiantar
+   a proxima licao enquanto a pessoa estuda a atual: quando ela clica em
+   "Próxima lição", nao ha espera nenhuma. */
+async function verLicao(id, refazer, silencio){
   const l = byId(id);
-  const cabeca = h("div", {class:"stack-s"},
+  if(silencio && cacheLicao[id]) return;
+  const cabeca = silencio ? null : h("div", {class:"stack-s"},
     h("button", {class:"btn ghost sm", style:"align-self:flex-start; margin-left:-10px",
       onclick:() => { licaoAberta = null; rotear(); }}, "‹ Trilha"),
     h("span", {class:"eyebrow"}, `${l.mod} · lição ${l.num}`),
@@ -1953,10 +1957,11 @@ async function verLicao(id, refazer){
 
   if(!refazer && cacheLicao[id]) return montarLicao(l, cabeca, cacheLicao[id]);
 
-  const espera = palco(true);
-  Larissa.pensa(true);
-  pintar(cabeca, espera, h("div", {class:"panel", style:"display:flex; gap:10px; align-items:center"},
-    h("span", {class:"spin"}), h("span", {class:"lead"}, "Larissa está preparando sua aula…")));
+  if(!silencio){
+    Larissa.pensa(true);
+    pintar(cabeca, palco(true), h("div", {class:"panel", style:"display:flex; gap:10px; align-items:center"},
+      h("span", {class:"spin"}), h("span", {class:"lead"}, "Larissa está preparando sua aula…")));
+  }
 
   const sistema =
 `Você é Larissa, uma professora de ${L().adj} brasileira: didática, calorosa e direta. Ensina adultos brasileiros iniciantes.
@@ -1984,9 +1989,11 @@ Use 3 pontos, 5 exemplos e exatamente 5 exercícios misturando os dois tipos. Em
     const d = await pedirJSON({prompt, sistema});
     if(!d || !Array.isArray(d.exercicios) || !d.exercicios.length) throw new ErroIA("json", "A aula veio incompleta. Toque de novo.");
     guardarAula(id, d);
+    if(silencio) return;
     Larissa.pensa(false);
     if(licaoAberta === id) montarLicao(l, cabeca, d);
   }catch(e){
+    if(silencio) return;                 // adiantamento que falha nao incomoda ninguem
     Larissa.pensa(false);
     if(e?.codigo === "cancelado") return;
     pintar(cabeca, h("div", {class:"panel stack-s"},
@@ -2097,6 +2104,12 @@ function montarLicao(l, cabeca, d){
 
   const refazerBtn = h("button", {class:"btn ghost sm", style:"align-self:flex-start; margin-left:-10px",
     onclick:() => { delete cacheLicao[l.id]; verLicao(l.id, true); }}, "↻ Gerar outra versão desta aula");
+
+  // enquanto voce estuda esta, a proxima ja vai ficando pronta
+  const lista = licoes(), i = lista.findIndex(x => x.id === l.id);
+  const seguinte = lista[i + 1];
+  if(seguinte && !cacheLicao[seguinte.id])
+    setTimeout(() => verLicao(seguinte.id, false, true), 2500);
 
   const feita = S.feitas[l.id];
   pintar(cabeca, palco(true), teoria, exemplos, refazerBtn,
