@@ -1032,7 +1032,98 @@ async function ouvirAuto({onFim, onErro}){
   mr.start();
 }
 
+let conversaViva = false;
+let enviarAtual = null;   // preenchido pelo painel da conversa
+
 function pararAuto(){ try{ gravador?.stop(); }catch(e){} }
+
+/* Escuta ate voce parar de falar. Mede o volume do microfone: depois que
+   houve fala, um segundo e pouco de silencio encerra o turno. E o que
+   dispensa o botao de enviar. */
+async function escutarTurno(){
+  if(!TEM_GRAVADOR || !AZURE) return null;
+  let fluxo;
+  try{ fluxo = await navigator.mediaDevices.getUserMedia({audio:true}); }
+  catch(e){ return {erro:"not-allowed"}; }
+
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  const ctx = new Ctx();
+  const analise = ctx.createAnalyser();
+  analise.fftSize = 1024;
+  ctx.createMediaStreamSource(fluxo).connect(analise);
+  const amostra = new Uint8Array(analise.frequencyBinCount);
+
+  const partes = [];
+  const mr = new MediaRecorder(fluxo);
+  gravador = mr; gravando = true;
+  mr.ondataavailable = ev => { if(ev.data && ev.data.size) partes.push(ev.data); };
+  mr.start();
+  Larissa.ouve(true);
+
+  const inicio = Date.now();
+  let houveFala = false, quietoDesde = 0, cancelado = false;
+
+  await new Promise(res => {
+    const olho = setInterval(() => {
+      if(!conversaViva){ cancelado = true; clearInterval(olho); return res(); }
+      analise.getByteTimeDomainData(amostra);
+      let pico = 0;
+      for(let i = 0; i < amostra.length; i++){
+        const d = Math.abs(amostra[i] - 128);
+        if(d > pico) pico = d;
+      }
+      const agora = Date.now();
+      if(pico > 9){ houveFala = true; quietoDesde = 0; }
+      else if(houveFala){
+        if(!quietoDesde) quietoDesde = agora;
+        else if(agora - quietoDesde > 1100){ clearInterval(olho); return res(); }
+      }
+      // nem esperar para sempre por quem nao fala, nem deixar falar sem fim
+      if(!houveFala && agora - inicio > 9000){ clearInterval(olho); return res(); }
+      if(agora - inicio > 30000){ clearInterval(olho); return res(); }
+    }, 90);
+  });
+
+  const parou = new Promise(res => { mr.onstop = res; });
+  try{ mr.stop(); }catch(e){}
+  await parou;
+  gravando = false; gravador = null;
+  fluxo.getTracks().forEach(t => t.stop());
+  try{ ctx.close(); }catch(e){}
+  Larissa.ouve(false);
+
+  if(cancelado || !houveFala) return null;
+
+  Larissa.pensa(true);
+  try{
+    const bruto = new Blob(partes, {type: mr.mimeType || "audio/webm"});
+    if(bruto.size < 1200){ Larissa.pensa(false); return null; }
+    const wav = await paraWav16k(bruto);
+    const r = await fetch(`${PROXY}/api/ouvir?idiomas=pt-BR,${L().locale}`, {
+      method:"POST", headers:{"Content-Type":"audio/wav"}, body: wav,
+    });
+    const d = r.ok ? await r.json() : {};
+    Larissa.pensa(false);
+    const texto = String(d.texto || "").trim();
+    return texto ? {texto, idioma: d.idioma} : null;
+  }catch(e){ Larissa.pensa(false); return null; }
+}
+
+async function cicloConversa(aviso){
+  while(conversaViva){
+    const t = await escutarTurno();
+    if(!conversaViva) break;
+    if(t && t.erro === "not-allowed"){
+      conversaViva = false;
+      aviso("Permita o microfone no navegador para conversar.");
+      break;
+    }
+    if(!t){ continue; }                       // silencio: escuta de novo
+    aviso("");
+    await enviarAtual?.(t.texto);
+    await esperarSilencio();                  // so reabre depois que ela calar
+  }
+}
 
 function ouvir({onParcial, onFim, onErro}){
   if(!TEM_MIC) return onErro?.("sem-suporte");
@@ -1290,6 +1381,20 @@ async function aquecerVoz(texto){
     }
     if(blob) cacheVoz.set(chave, URL.createObjectURL(blob));
   }catch(e){}
+}
+
+/* O ciclo so pode reabrir o microfone depois que ela calar, senao ela se
+   escuta e responde a si mesma. */
+function esperarSilencio(){
+  return new Promise(res => {
+    const olho = setInterval(() => {
+      const tocandoIA = tocando && !tocando.paused && !tocando.ended;
+      let sintetizando = false;
+      try{ sintetizando = speechSynthesis.speaking; }catch(e){}
+      if(!tocandoIA && !sintetizando){ clearInterval(olho); res(); }
+    }, 160);
+    setTimeout(() => { clearInterval(olho); res(); }, 30000);
+  });
 }
 
 function pararVoz(){
@@ -1975,6 +2080,7 @@ A resposta do aluno também está correta em ${L().adj} natural? Comece por "Val
 /* ---------- Falar ---------- */
 
 function verFalar(){
+  conversaViva = false;   // trocar de aba encerra o ciclo
   const seg = h("div", {class:"seg"},
     h("button", {"aria-pressed": sub === "conversa", onclick:() => { sub = "conversa"; rotear(); }}, "Conversa"),
     h("button", {"aria-pressed": sub === "pronuncia", onclick:() => { sub = "pronuncia"; rotear(); }}, "Pronúncia"));
@@ -2053,10 +2159,10 @@ function painelConversa(){
     return m;
   }
 
-  async function enviar(){
-    const txt = campo.value.trim();
+  async function enviar(pronto){
+    const txt = (typeof pronto === "string" ? pronto : campo.value).trim();
     if(!txt) return;
-    campo.value = ""; campo.style.height = "auto";
+    if(typeof pronto !== "string"){ campo.value = ""; campo.style.height = "auto"; }
     bolha("me", txt);
     turnos.push({role:"user", content:txt});
 
@@ -2098,6 +2204,8 @@ function painelConversa(){
   if(turnos.length === 0){
     lista.append(h("div", {class:"empty"},
       `Fale em ${L().adj} — nem que seja `, h("i", {}, L().oi), ` — ou pergunte em português.`,
+      AZURE ? h("span", {}, h("br"), h("b", {}, "Toque em Conversar"),
+        " e fale à vontade: ela percebe quando você parou, responde falando e volta a ouvir.") : null,
       h("br"), "Larissa corrige o que você tentou e explica o que você não sabe.",
       TEM_MIC ? h("span", {}, h("br"),
         h("small", {style:"opacity:.75"},
@@ -2116,8 +2224,35 @@ function painelConversa(){
     h("span", {}, h("b", {}, "Sem reconhecimento de voz neste navegador. "),
       "Dá para escrever normalmente, e a Larissa continua falando com você. Para falar, use o Chrome — no Safari do iPhone o reconhecimento não é confiável.")));
 
+  enviarAtual = enviar;
+
+  const recadoCiclo = h("p", {class:"lead", style:"font-size:12.5px; text-align:center; margin:0", hidden:true});
+  const avisar = t => { recadoCiclo.textContent = t; recadoCiclo.hidden = !t; };
+
+  const btCiclo = (AZURE && TEM_GRAVADOR)
+    ? h("button", {class:"btn" + (conversaViva ? " primary" : ""), style:"flex:0 0 auto",
+        onclick: async ev => {
+          const b = ev.currentTarget;
+          if(conversaViva){
+            conversaViva = false; pararAuto(); pararVoz();
+            b.classList.remove("primary"); b.textContent = "📞 Conversar";
+            avisar("");
+            return;
+          }
+          conversaViva = true;
+          b.classList.add("primary"); b.textContent = "⏹ Parar";
+          avisar("Pode falar. Eu escuto e respondo sozinha.");
+          await cicloConversa(avisar);
+          conversaViva = false;
+          b.classList.remove("primary"); b.textContent = "📞 Conversar";
+        }}, "📞 Conversar")
+    : null;
+
   return h("div", {class:"stack"}, ...avisos,
-    h("div", {class:"panel lift"}, lista, h("div", {class:"composer"}, campo, (TEM_MIC || (AZURE && TEM_GRAVADOR)) ? micBtn : null, enviarBtn)),
+    h("div", {class:"panel lift"}, lista,
+      h("div", {class:"composer"}, campo, (TEM_MIC || (AZURE && TEM_GRAVADOR)) ? micBtn : null, enviarBtn),
+      btCiclo ? h("div", {class:"row", style:"justify-content:center; margin-top:10px"}, btCiclo) : null,
+      recadoCiclo),
     turnos.length ? h("button", {class:"btn ghost sm", style:"align-self:center",
       onclick:() => { turnos = []; rotear(); }}, "Limpar conversa") : null);
 }
