@@ -2011,8 +2011,8 @@ function montarLicao(l, cabeca, d){
         b.disabled = true;
         b.replaceChildren(h("span", {class:"spin"}), document.createTextNode(" preparando…"));
         try{ await falarPT(d.resumo); }catch(e){}
-        b.disabled = false; b.textContent = "🔊 Larissa explica";
-      }}, "🔊 Larissa explica")
+        b.disabled = false; b.textContent = "🔊 Ouvir de novo";
+      }}, "🔊 Ouvir de novo")
     : null;
 
   const teoria = h("div", {class:"panel lift stack"},
@@ -2116,6 +2116,11 @@ function montarLicao(l, cabeca, d){
     feita ? h("div", {class:"note"}, h("span", {}, "✓"),
       h("span", {}, `Você já fez esta lição e acertou ${feita.acertos} de ${feita.total}. Refazer não tira pontos.`)) : null,
     h("span", {class:"eyebrow"}, "Agora pratique"), exArea, fim);
+
+  /* Ela apresenta a licao sozinha. O clique em "Estudar esta licao" conta
+     como o gesto que os navegadores exigem para tocar som; se ainda assim
+     bloquearem, o botao continua ali para ouvir quando quiser. */
+  if(CFG.narrar !== false && d.resumo) setTimeout(() => falarPT(d.resumo), 400);
 }
 
 async function julgar(btn, minha, certa, pergunta){
