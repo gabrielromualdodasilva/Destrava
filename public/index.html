@@ -1128,11 +1128,11 @@ async function listarVozesAzure(){
 
 /* O Azure devolve MP3 pronto — nada de montar cabecalho. E sao 500 mil
    caracteres por mes de graca, entao nao e preciso racionar. */
-async function gerarVozAzure(texto, voz, idioma){
+async function gerarVozAzure(texto, voz, idioma, taxa){
   try{
     const r = await fetch(`${PROXY}/api/voz`, {
       method:"POST", headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({texto, voz, idioma}),
+      body: JSON.stringify({texto, voz, idioma, taxa}),
     });
     if(!r.ok) return null;
     const b = await r.blob();
@@ -1192,12 +1192,12 @@ async function aquecerVoz(texto){
   if(!AZURE && semCotaHoje) return;
   const motor = AZURE ? "az" : "gem";
   const vozAtual = AZURE ? (CFG.vozAzure || VOZ_AZ_PADRAO) : (CFG.vozIA || "Kore");
-  const chave = motor + "|" + vozAtual + "|pt-BR|" + texto;
+  const chave = motor + "|" + vozAtual + "|pt-BR|1|" + texto;
   if(cacheVoz.has(chave)) return;
   try{
     let blob = await doCofre(chave);
     if(!blob){
-      blob = AZURE ? await gerarVozAzure(texto, vozAtual, "pt-BR") : await gerarVoz(texto);
+      blob = AZURE ? await gerarVozAzure(texto, vozAtual, "pt-BR", 1) : await gerarVoz(texto);
       if(blob) paraCofre(chave, blob);
     }
     if(blob) cacheVoz.set(chave, URL.createObjectURL(blob));
@@ -1213,7 +1213,7 @@ function pararVoz(){
 
 /* Diz o texto com a melhor voz disponivel. `reserva` e a funcao que fala
    com a voz do aparelho, caso a do Gemini nao venha. */
-async function dizer(texto, reserva, idioma){
+async function dizer(texto, reserva, idioma, taxa){
   if(!texto) return;
   pararVoz();
   if(!SERVIDOR || CFG.natural === false) return reserva();
@@ -1222,7 +1222,9 @@ async function dizer(texto, reserva, idioma){
   const motor = AZURE ? "az" : "gem";
   const vozAtual = AZURE ? (CFG.vozAzure || VOZ_AZ_PADRAO) : (CFG.vozIA || "Kore");
   const lingua = idioma || L().locale;
-  const chave = motor + "|" + vozAtual + "|" + lingua + "|" + texto;
+  const vel = Math.min(1.5, Math.max(0.5, Number(taxa) || 1));
+  // a velocidade entra na chave: senao "devagar" tocaria o audio do "normal"
+  const chave = motor + "|" + vozAtual + "|" + lingua + "|" + vel + "|" + texto;
 
   let url = cacheVoz.get(chave);
   if(!url){
@@ -1232,7 +1234,7 @@ async function dizer(texto, reserva, idioma){
       const antes = Larissa.estado;
       if(antes === "parada") Larissa.pensa(true);
       try{
-        blob = AZURE ? await gerarVozAzure(texto, vozAtual, lingua) : await gerarVoz(texto);
+        blob = AZURE ? await gerarVozAzure(texto, vozAtual, lingua, vel) : await gerarVoz(texto);
       }catch(e){ blob = null; }
       if(Larissa.estado === "pensando") Larissa.vai(antes);
       if(!blob) return reserva();                 // sem cota ou sem rede
@@ -1256,7 +1258,7 @@ async function dizer(texto, reserva, idioma){
   }catch(e){ reserva(); }
 }
 
-function falar(texto, taxa){ return dizer(texto, () => falarAparelho(texto, taxa), L().locale); }
+function falar(texto, taxa){ return dizer(texto, () => falarAparelho(texto, taxa), L().locale, taxa); }
 
 function falarAparelho(texto, taxa){
   if(!window.speechSynthesis || !texto) return;
@@ -2341,7 +2343,7 @@ function verAjustes(){
       taxa,
       h("button", {class:"btn", style:"align-self:flex-start", onclick:() => {
         CFG.voz = voz.value; CFG.taxa = Number(taxa.value); gravarCfg();
-        falar(L().saudacao, CFG.taxa);
+        falarAparelho(L().saudacao, CFG.taxa);
       }}, "🔊 Testar a voz do aparelho"),
       h("div", {class:"note"}, h("span", {}, "🎙️"),
         AZURE

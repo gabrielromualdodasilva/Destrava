@@ -37,9 +37,17 @@ async function vozAzure(request, env, livre){
      declarado. Por isso a pagina diz em que lingua o texto esta. */
   const idioma = LOCALE_OK.test(String(b.idioma || "")) ? b.idioma : voz.slice(0, 5);
 
+  /* Velocidade vira prosody. Sem isso o botao "devagar" do treino de
+     pronuncia soava igual ao normal — o Azure nao tem como adivinhar. */
+  const taxa = Math.min(1.5, Math.max(0.5, Number(b.taxa) || 1));
+  const pct = Math.round((taxa - 1) * 100);
+  const corpoFala = pct === 0
+    ? escaparXml(texto)
+    : `<prosody rate="${pct > 0 ? "+" : ""}${pct}%">${escaparXml(texto)}</prosody>`;
+
   const ssml =
     `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="${idioma}">` +
-    `<voice name="${voz}">${escaparXml(texto)}</voice></speak>`;
+    `<voice name="${voz}">${corpoFala}</voice></speak>`;
 
   const r = await fetch(`https://${env.AZURE_REGION}.tts.speech.microsoft.com/cognitiveservices/v1`, {
     method: "POST",
