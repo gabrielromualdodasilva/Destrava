@@ -1,14 +1,18 @@
-# Teste de fumaça
+# Testes
 
-Carrega `public/index.html` num DOM de verdade (jsdom), com Firebase e voz
-simulados, escolhe um idioma e confere se a trilha montou.
+Rodam a página num DOM de verdade (jsdom), com Firebase, voz e Worker
+simulados. Existem porque `node --check` valida sintaxe, não execução — uma
+variável `let` usada antes da declaração já derrubou a página inteira com a
+sintaxe perfeita.
 
 ```
 npm install jsdom
-node teste/fumaca.mjs public/index.html
+node teste/completo.mjs public/index.html    # 24 verificações
+node teste/fumaca.mjs   public/index.html    # checagem rápida
 ```
 
-Existe porque `node --check` valida sintaxe, não execução. Uma vez uma
-variável `let` declarada depois de já ser usada derrubou o script inteiro
-no arranque: a sintaxe estava correta, a página abria em branco, e só a
-barra de cima aparecia — porque o texto dela está no HTML.
+O `completo.mjs` percorre o app como uma pessoa: escolhe o idioma, abre a
+primeira lição, responde os cinco exercícios, confere a nota, passa por
+todas as abas e volta para a trilha para ver se a lição ficou marcada.
+
+Rode antes de publicar.

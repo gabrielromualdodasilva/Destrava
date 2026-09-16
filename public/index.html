@@ -59,7 +59,12 @@
   html{height:100%}
   body{
     margin:0; min-height:100%;
-    background:var(--bg); color:var(--ink);
+    /* um claro suave no alto: tira a chapa do fundo sem virar decoracao */
+    background:var(--bg);
+    background-image:radial-gradient(1100px 520px at 50% -12%,
+      color-mix(in srgb, var(--accent) 9%, transparent), transparent 72%);
+    background-attachment:fixed;
+    color:var(--ink);
     font-family:var(--sans); font-size:16px; line-height:1.5;
     -webkit-font-smoothing:antialiased; -webkit-text-size-adjust:100%;
   }
@@ -225,28 +230,59 @@
     box-shadow:var(--shadow); display:flex; flex-direction:column; gap:13px;
     border-left:4px solid var(--accent);
   }
-  .hero .n{font-family:var(--mono); font-size:12px; color:var(--ink-3)}
-  .bar{height:6px; border-radius:999px; background:var(--surface-2); overflow:hidden}
-  .bar i{display:block; height:100%; background:var(--accent); border-radius:999px; transition:width .5s ease}
-
-  .mod{margin-top:22px}
-  .mod-head{display:flex; align-items:baseline; gap:10px; padding-bottom:7px; border-bottom:1px solid var(--line); margin-bottom:2px}
-  .mod-head .t{font-weight:700; font-size:14.5px}
-  .mod-head .c{margin-left:auto; font-family:var(--mono); font-size:12px; color:var(--ink-3)}
-  .les{
-    display:flex; align-items:center; gap:12px; width:100%; text-align:left;
-    background:none; border:0; border-bottom:1px solid var(--line-2); padding:12px 2px; color:inherit;
+  .hero .n{font-size:12.5px; color:var(--ink-3); font-weight:600}
+  .hero .conta{display:flex; align-items:baseline; gap:7px}
+  .hero .conta b{font-size:26px; font-weight:700; line-height:1; font-variant-numeric:tabular-nums}
+  .bar{height:8px; border-radius:999px; background:var(--surface-2); overflow:hidden}
+  .bar i{
+    display:block; height:100%; border-radius:999px; transition:width .6s cubic-bezier(.3,1,.4,1);
+    background:linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 60%, var(--signal)));
   }
+
+  .mod{margin-top:26px}
+  .mod-head{display:flex; align-items:center; gap:10px; margin-bottom:6px}
+  .mod-head .t{font-family:var(--serif); font-weight:600; font-size:18px; letter-spacing:-.01em}
+  .mod-head .c{
+    margin-left:auto; font-size:11.5px; font-weight:700; padding:3px 9px; border-radius:999px;
+    background:var(--surface-2); color:var(--ink-3); font-variant-numeric:tabular-nums;
+  }
+  .mod-head.pronto .c{background:var(--good-soft); color:var(--good)}
+
+  /* O nome e trilha: entao existe um caminho ligando as licoes, e ele fica
+     verde ate onde voce chegou. A posicao no percurso vira visivel. */
+  .les{
+    position:relative; display:flex; align-items:center; gap:14px; width:100%;
+    text-align:left; background:none; border:0; padding:11px 8px 11px 2px;
+    color:inherit; border-radius:10px;
+  }
+  .les::before{
+    content:""; position:absolute; left:14px; top:0; bottom:0; width:2px;
+    background:var(--line-2); z-index:0;
+  }
+  .les:first-of-type::before{top:50%}
+  .les:last-of-type::before{bottom:50%}
+  .les.done::before{background:color-mix(in srgb, var(--good) 55%, transparent)}
   .les:hover{background:var(--surface-2)}
   .les .dot{
-    flex:0 0 auto; width:25px; height:25px; border-radius:50%;
-    border:1.5px solid var(--line); display:grid; place-items:center;
-    font-family:var(--mono); font-size:11px; color:var(--ink-3);
+    position:relative; z-index:1; flex:0 0 auto; width:27px; height:27px;
+    border-radius:50%; border:2px solid var(--line); background:var(--bg);
+    display:grid; place-items:center; font-size:11.5px; font-weight:700; color:var(--ink-3);
+    transition:transform .18s ease;
   }
+  .les:hover .dot{transform:scale(1.08)}
   .les.done .dot{background:var(--good); border-color:transparent; color:#fff}
-  .les.done .dot svg{width:13px; height:13px; stroke:currentColor; fill:none; stroke-width:2.6; stroke-linecap:round; stroke-linejoin:round}
+  .les.done .dot svg{width:13px; height:13px; stroke:currentColor; fill:none; stroke-width:2.8; stroke-linecap:round; stroke-linejoin:round}
+  .les.done .t{color:var(--ink-2)}
+  /* onde voce parou */
+  .les.agora .dot{border-color:var(--accent); color:var(--accent); box-shadow:0 0 0 4px var(--accent-soft)}
+  .les.agora .t{font-weight:700}
   .les .t{font-size:14.5px; font-weight:500; flex:1; min-width:0}
-  .les .s{font-family:var(--mono); font-size:11.5px; color:var(--ink-3); font-variant-numeric:tabular-nums}
+  .les .s{
+    font-size:11.5px; font-weight:700; color:var(--ink-3);
+    font-variant-numeric:tabular-nums; padding:2px 8px; border-radius:999px;
+  }
+  .les.done .s{background:var(--good-soft); color:var(--good)}
+  .les.agora .s{background:var(--accent); color:var(--accent-ink)}
 
   .ex{background:var(--surface-2); border-radius:11px; padding:13px 14px}
   .ex .pt{color:var(--ink-2); font-size:14px; margin-top:2px}
@@ -1808,7 +1844,9 @@ function verTrilha(){
         h("div", {}, h("div", {class:"n"}, p.mod), h("h2", {style:"margin-top:2px"}, p.t)),
         h("button", {class:"btn primary wide", onclick:() => { licaoAberta = p.id; rotear(); }}, "Estudar esta lição"),
         h("div", {class:"bar"}, h("i", {style:`width:${Math.round(100*feitas/total())}%`})),
-        h("div", {class:"n"}, `${feitas} de ${total()} lições`))
+        h("div", {class:"conta"},
+          h("b", {}, String(feitas)),
+          h("span", {class:"n"}, `de ${total()} lições · ${Math.round(100*feitas/total())}%`)))
     : h("div", {class:"hero"},
         h("span", {class:"eyebrow"}, "Trilha completa"),
         h("h2", {}, `Você terminou as ${total()} lições de ${L().nome.toLowerCase()}`),
@@ -1818,13 +1856,16 @@ function verTrilha(){
   const mods = L().curriculo.map(m => {
     const done = m.ls.filter(l => S.feitas[l.id]).length;
     return h("section", {class:"mod"},
-      h("div", {class:"mod-head"}, h("span", {class:"t"}, m.m), h("span", {class:"c"}, `${done}/${m.ls.length}`)),
+      h("div", {class:"mod-head" + (done === m.ls.length ? " pronto" : "")},
+        h("span", {class:"t"}, m.m),
+        h("span", {class:"c"}, done === m.ls.length ? "completo" : `${done}/${m.ls.length}`)),
       ...m.ls.map((l, li) => {
-        const f = S.feitas[l.id];
-        return h("button", {class:"les" + (f ? " done" : ""), onclick:() => { licaoAberta = l.id; rotear(); }},
+        const f = S.feitas[l.id], agora = p && p.id === l.id;
+        return h("button", {class:"les" + (f ? " done" : "") + (agora ? " agora" : ""),
+          onclick:() => { licaoAberta = l.id; rotear(); }},
           h("span", {class:"dot", html: f ? `<svg viewBox="0 0 24 24">${ICO.check}</svg>` : String(li+1)}),
           h("span", {class:"t"}, l.t),
-          h("span", {class:"s"}, f ? `${f.acertos}/${f.total}` : "›"));
+          h("span", {class:"s"}, f ? `${f.acertos}/${f.total}` : agora ? "continuar" : "›"));
       }));
   });
 
