@@ -955,6 +955,85 @@ const RecCls = window.SpeechRecognition || window.webkitSpeechRecognition;
 const TEM_MIC = !!RecCls;
 let rec = null, gravando = false, micPT = false;
 
+/* Modo do microfone: "auto" manda o audio para o Azure, que devolve o texto
+   e em que lingua voce falou. "alvo" e "pt" usam o reconhecimento do
+   navegador, que e instantaneo mas ouve uma lingua so. */
+let micModo = "auto";
+const TEM_GRAVADOR = !!(window.MediaRecorder && navigator.mediaDevices?.getUserMedia);
+
+/* O Azure quer WAV PCM 16 kHz mono; o navegador grava WebM/Opus. A conversao
+   e feita aqui, com o proprio motor de audio do navegador — sem biblioteca.
+   Foi so isso que faltava na primeira tentativa. */
+async function paraWav16k(blob){
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  const ctx = new Ctx();
+  let audio;
+  try{ audio = await ctx.decodeAudioData(await blob.arrayBuffer()); }
+  finally{ try{ ctx.close(); }catch(e){} }
+
+  const taxa = 16000;
+  const quadros = Math.max(1, Math.ceil(audio.duration * taxa));
+  const off = new OfflineAudioContext(1, quadros, taxa);
+  const fonte = off.createBufferSource();
+  fonte.buffer = audio;
+  fonte.connect(off.destination);
+  fonte.start();
+  const pronto = await off.startRendering();
+  const canal = pronto.getChannelData(0), n = canal.length;
+
+  const buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
+  const escrever = (o, t) => { for(let i = 0; i < t.length; i++) v.setUint8(o + i, t.charCodeAt(i)); };
+  escrever(0, "RIFF"); v.setUint32(4, 36 + n * 2, true);
+  escrever(8, "WAVE"); escrever(12, "fmt ");
+  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, taxa, true); v.setUint32(28, taxa * 2, true);
+  v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+  escrever(36, "data"); v.setUint32(40, n * 2, true);
+  for(let i = 0, o = 44; i < n; i++, o += 2){
+    const x = Math.max(-1, Math.min(1, canal[i]));
+    v.setInt16(o, x < 0 ? x * 0x8000 : x * 0x7FFF, true);
+  }
+  return new Blob([buf], {type:"audio/wav"});
+}
+
+let gravador = null, pedacos = [];
+
+async function ouvirAuto({onFim, onErro}){
+  if(!TEM_GRAVADOR || !AZURE) return onErro?.("sem-suporte");
+  let fluxo;
+  try{ fluxo = await navigator.mediaDevices.getUserMedia({audio:true}); }
+  catch(e){ return onErro?.("not-allowed"); }
+
+  pedacos = [];
+  const mr = new MediaRecorder(fluxo);
+  gravador = mr; gravando = true;
+  Larissa.ouve(true);
+
+  mr.ondataavailable = ev => { if(ev.data && ev.data.size) pedacos.push(ev.data); };
+  mr.onstop = async () => {
+    gravando = false; gravador = null;
+    fluxo.getTracks().forEach(t => t.stop());
+    Larissa.pensa(true);
+    try{
+      const bruto = new Blob(pedacos, {type: mr.mimeType || "audio/webm"});
+      if(bruto.size < 1200){ Larissa.pensa(false); return onFim?.("", null); }
+      const wav = await paraWav16k(bruto);
+      const r = await fetch(`${PROXY}/api/ouvir?idiomas=pt-BR,${L().locale}`, {
+        method:"POST", headers:{"Content-Type":"audio/wav"}, body: wav,
+      });
+      const d = r.ok ? await r.json() : {};
+      Larissa.pensa(false);
+      onFim?.(String(d.texto || "").trim(), d.idioma || null);
+    }catch(e){
+      Larissa.pensa(false);
+      onErro?.("falhou");
+    }
+  };
+  mr.start();
+}
+
+function pararAuto(){ try{ gravador?.stop(); }catch(e){} }
+
 function ouvir({onParcial, onFim, onErro}){
   if(!TEM_MIC) return onErro?.("sem-suporte");
   try{ rec?.abort(); }catch(e){}
@@ -1945,20 +2024,26 @@ function painelConversa(){
   /* O reconhecimento do navegador ouve uma lingua por vez — nao existe
      deteccao automatica. Entao a escolha fica colada no microfone: um toque
      na etiqueta troca, e ela mostra o que ele vai ouvir agora. */
-  if(TEM_MIC){
-    const marca = h("span", {class:"micLingua", role:"button", tabindex:"0",
-      title:"Toque para trocar o idioma que o microfone ouve"},
-      micPT ? "PT" : L().bandeira);
+  if(TEM_MIC || (AZURE && TEM_GRAVADOR)){
+    const podeAuto = AZURE && TEM_GRAVADOR;
+    if(!podeAuto && micModo === "auto") micModo = "alvo";
+    const ciclo = podeAuto ? ["auto", "alvo", "pt"] : ["alvo", "pt"];
+    const rotulo = () => micModo === "auto" ? "AUTO" : micModo === "pt" ? "PT" : L().bandeira;
+    const dica = () => micModo === "auto"
+      ? "Ela descobre sozinha em que língua você falou. Toque para fixar um idioma."
+      : micModo === "pt" ? "Ouvindo em português. Toque para trocar."
+      : `Ouvindo em ${L().nome}. Toque para trocar.`;
+
+    const marca = h("span", {class:"micLingua", role:"button", tabindex:"0", title: dica()}, rotulo());
     const trocar = ev => {
       ev.stopPropagation(); ev.preventDefault();
-      micPT = !micPT;
-      marca.textContent = micPT ? "PT" : L().bandeira;
-      micBtn.setAttribute("aria-label", micPT ? "Falar em português" : `Falar em ${L().nome}`);
+      micModo = ciclo[(ciclo.indexOf(micModo) + 1) % ciclo.length];
+      marca.textContent = rotulo();
+      marca.title = dica();
     };
     marca.addEventListener("click", trocar);
     marca.addEventListener("keydown", ev => { if(ev.key === "Enter" || ev.key === " ") trocar(ev); });
     micBtn.append(marca);
-    micBtn.setAttribute("aria-label", micPT ? "Falar em português" : `Falar em ${L().nome}`);
   }
   const enviarBtn = h("button", {class:"btn primary", onclick:() => enviar()}, "Enviar");
 
@@ -2016,7 +2101,9 @@ function painelConversa(){
       h("br"), "Larissa corrige o que você tentou e explica o que você não sabe.",
       TEM_MIC ? h("span", {}, h("br"),
         h("small", {style:"opacity:.75"},
-          "No microfone, a etiqueta mostra em que idioma ele está ouvindo. Toque nela para trocar.")) : null));
+          AZURE
+            ? "Em AUTO, ela descobre sozinha se você falou português ou não — é só falar."
+            : "No microfone, a etiqueta mostra em que idioma ele está ouvindo. Toque nela para trocar.")) : null));
   } else {
     for(const t of turnos){
       if(t.role === "user") bolha("me", t.content);
@@ -2030,19 +2117,43 @@ function painelConversa(){
       "Dá para escrever normalmente, e a Larissa continua falando com você. Para falar, use o Chrome — no Safari do iPhone o reconhecimento não é confiável.")));
 
   return h("div", {class:"stack"}, ...avisos,
-    h("div", {class:"panel lift"}, lista, h("div", {class:"composer"}, campo, TEM_MIC ? micBtn : null, enviarBtn)),
+    h("div", {class:"panel lift"}, lista, h("div", {class:"composer"}, campo, (TEM_MIC || (AZURE && TEM_GRAVADOR)) ? micBtn : null, enviarBtn)),
     turnos.length ? h("button", {class:"btn ghost sm", style:"align-self:center",
       onclick:() => { turnos = []; rotear(); }}, "Limpar conversa") : null);
 }
 
 function alternarMic(campo){
   const b = $("mic");
-  if(gravando){ pararMic(); b.classList.remove("rec"); return; }
+  if(gravando){ pararMic(); pararAuto(); b.classList.remove("rec"); return; }
   b.classList.add("rec");
+
+  const falhou = err => {
+    b.classList.remove("rec");
+    if(err === "not-allowed") campo.placeholder = "Permita o microfone no navegador.";
+    else if(err !== "aborted" && err !== "no-speech") campo.placeholder = "Não consegui ouvir. Escreva aqui.";
+  };
+
+  if(micModo === "auto" && AZURE && TEM_GRAVADOR){
+    campo.placeholder = "Ouvindo… toque de novo quando terminar.";
+    ouvirAuto({
+      onFim: (texto, idioma) => {
+        b.classList.remove("rec");
+        campo.placeholder = "Escreva ou toque no microfone…";
+        if(!texto){ campo.placeholder = "Não ouvi nada. Tente de novo."; return; }
+        campo.value = texto; campo.focus();
+        // a Larissa ja aceita os dois idiomas; saber qual foi so ajuda o tom
+        if(idioma) campo.dataset.idioma = idioma;
+      },
+      onErro: falhou,
+    });
+    return;
+  }
+
+  micPT = micModo === "pt";
   ouvir({
     onParcial: t => { campo.value = t; },
     onFim: t => { b.classList.remove("rec"); campo.value = t; campo.focus(); },
-    onErro: err => { b.classList.remove("rec"); if(err !== "aborted" && err !== "no-speech") campo.placeholder = "Não consegui ouvir. Escreva aqui."; },
+    onErro: falhou,
   });
 }
 
