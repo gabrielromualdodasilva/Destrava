@@ -693,7 +693,7 @@ const NOVO = () => ({
   feitas:{}, xp:0, streak:{n:0, dia:null}, erros:[], falados:{}, v:1, em:0,
 });
 const CFG_NOVO = () => ({chave:"", modelo:"gemini-flash-lite-latest", voz:"", vozPT:"",
-  taxa:0.92, vozIA:"Kore", vozAzure:"", natural:true});
+  taxa:0.92, vozIA:"Kore", vozAzure:"", natural:true, narrar:true});
 
 let S = NOVO(), CFG = CFG_NOVO();
 let LS = "destrava.estado.v1", LS_CFG = "destrava.cfg.v1";
@@ -1660,6 +1660,27 @@ function verTrilha(){
   setTimeout(() => aquecerVoz(dica), 400);
 }
 
+/* Reacoes curtas e sempre as mesmas, de proposito: assim cada uma e gerada
+   uma vez na vida e fica no cofre. Falar durante a licao passa a custar zero.
+   Como psicologa que trabalha com criancas, ela normaliza o erro em vez de
+   so apontar — vergonha de errar trava mais que falta de vocabulario. */
+const ELOGIOS = [
+  "Isso!", "Muito bem!", "Exatamente.", "Perfeito.", "Boa!",
+];
+const ANIMOS = [
+  "Quase. Olha a explicação comigo.",
+  "Tudo bem errar, é assim que fixa.",
+  "Essa é traiçoeira mesmo.",
+  "Calma, vamos entender essa.",
+  "Errou essa, acerta a próxima.",
+];
+const sorteio = lista => lista[Math.floor(Math.random() * lista.length)];
+
+function reagir(acertou){
+  if(CFG.narrar === false) return;
+  falarPT(sorteio(acertou ? ELOGIOS : ANIMOS));
+}
+
 /* ---------- Lição ----------
    As aulas geradas ficam salvas no navegador: reabrir uma lição é instantâneo,
    funciona sem internet e não gasta cota do Gemini de novo. */
@@ -1743,8 +1764,19 @@ Use 3 pontos, 5 exemplos e exatamente 5 exercícios misturando os dois tipos. Em
 }
 
 function montarLicao(l, cabeca, d){
+  const ouvirResumo = d.resumo
+    ? h("button", {class:"btn sm", style:"align-self:flex-start", onclick: async ev => {
+        const b = ev.currentTarget;
+        b.disabled = true;
+        b.replaceChildren(h("span", {class:"spin"}), document.createTextNode(" preparando…"));
+        try{ await falarPT(d.resumo); }catch(e){}
+        b.disabled = false; b.textContent = "🔊 Larissa explica";
+      }}, "🔊 Larissa explica")
+    : null;
+
   const teoria = h("div", {class:"panel lift stack"},
     h("p", {class:"lead", style:"font-size:15px; color:var(--ink)"}, d.resumo || ""),
+    ouvirResumo,
     ...(d.pontos || []).map(p => h("div", {class:"stack-s"}, h("h3", {}, p.titulo), h("p", {class:"lead"}, p.texto))),
     d.atencao ? h("div", {class:"note"}, h("span", {}, "⚠️"), h("span", {}, h("b", {}, "Cuidado: "), d.atencao)) : null);
 
@@ -1777,6 +1809,7 @@ function montarLicao(l, cabeca, d){
           else if(bi === oi) b.classList.add("wrong");
         });
         if(resp[i]) Larissa.comemora(false); else anotarErro(q.opcoes[oi], q.opcoes[certa], q.porque);
+        reagir(resp[i]);
         bloco.append(h("div", {class:"why"}, q.porque || ""));
         conferir();
       }}, o));
@@ -1792,6 +1825,8 @@ function montarLicao(l, cabeca, d){
         campo.disabled = true; enviar.disabled = true;
         campo.style.borderColor = igual ? "var(--good)" : "var(--bad)";
         if(!igual) anotarErro(campo.value.trim(), certa, q.porque);
+        if(igual) Larissa.comemora(false);
+        reagir(igual);
         bloco.append(h("div", {class:"ex", style:"margin-top:4px"},
           h("span", {class:"en"}, certa), q.porque ? h("div", {class:"pt"}, q.porque) : null));
         if(!igual) bloco.append(h("button", {class:"btn sm", style:"align-self:flex-start",
@@ -2351,6 +2386,16 @@ function verAjustes(){
               "500 mil caracteres por mês de graça — cerca de 8 mil frases. Na prática, sem limite para o seu uso.")
           : h("span", {}, h("b", {}, "Voz natural do Gemini. "),
               "Mais natural que a do aparelho, mas limitada a 10 frases novas por dia no plano gratuito.")),
+      h("div", {class:"stack-s", style:"gap:6px; margin-top:4px"},
+        h("span", {style:"font-size:13.5px; font-weight:600"}, "Ela comenta durante as lições"),
+        h("div", {class:"seg", style:"max-width:280px"},
+          h("button", {"aria-pressed": CFG.narrar !== false,
+            onclick:() => { CFG.narrar = true; gravarCfg(); rotear(); }}, "Comenta"),
+          h("button", {"aria-pressed": CFG.narrar === false,
+            onclick:() => { CFG.narrar = false; gravarCfg(); rotear(); }}, "Fica quieta")),
+        h("p", {class:"lead", style:"font-size:12.5px"},
+          "Reage a cada exercício com uma frase curta. São sempre as mesmas, então ficam guardadas e não consomem nada depois da primeira vez.")),
+
       h("div", {class:"seg", style:"max-width:340px"},
         h("button", {"aria-pressed": CFG.natural !== false,
           onclick:() => { CFG.natural = true; gravarCfg(); rotear(); }}, "Voz natural"),
