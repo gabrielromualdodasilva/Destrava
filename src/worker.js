@@ -68,6 +68,55 @@ async function vozAzure(request, env, livre){
   return new Response(r.body, { status: 200, headers: h });
 }
 
+/* Escuta com deteccao de idioma. O reconhecimento do navegador fala uma
+   lingua so — quem fala portugues num reconhecedor de ingles recebe lixo.
+   Aqui o mesmo audio vai para os dois idiomas e vence o de maior confianca. */
+async function ouvirAzure(request, env, livre){
+  if(!env.AZURE_KEY || !env.AZURE_REGION)
+    return json({ erro: "Azure não configurado." }, 503, livre);
+
+  const tipo = request.headers.get("content-type") || "audio/webm; codecs=opus";
+  const audio = await request.arrayBuffer();
+  if(!audio.byteLength || audio.byteLength > 4_000_000)
+    return json({ erro: "Áudio vazio ou grande demais." }, 400, livre);
+
+  const idiomas = (new URL(request.url).searchParams.get("idiomas") || "pt-BR,en-US")
+    .split(",").filter(x => LOCALE_OK.test(x)).slice(0, 3);
+  if(!idiomas.length) return json({ erro: "Idiomas inválidos." }, 400, livre);
+
+  const base = `https://${env.AZURE_REGION}.stt.speech.microsoft.com`
+             + `/speech/recognition/conversation/cognitiveservices/v1`;
+
+  const tentativas = await Promise.all(idiomas.map(async lang => {
+    try{
+      const r = await fetch(`${base}?language=${lang}&format=detailed`, {
+        method: "POST",
+        headers: {
+          "Ocp-Apim-Subscription-Key": env.AZURE_KEY,
+          "Content-Type": tipo,
+          "Accept": "application/json",
+        },
+        body: audio,
+      });
+      if(!r.ok) return { lang, texto: "", confianca: 0, erro: r.status };
+      const d = await r.json();
+      const melhor = (d.NBest || [])[0] || {};
+      return {
+        lang,
+        texto: melhor.Display || d.DisplayText || "",
+        confianca: Number(melhor.Confidence) || 0,
+        status: d.RecognitionStatus,
+      };
+    }catch(e){ return { lang, texto: "", confianca: 0 }; }
+  }));
+
+  const validas = tentativas.filter(t => t.texto && t.texto.trim());
+  if(!validas.length) return json({ texto: "", idioma: null, tentativas }, 200, livre);
+  validas.sort((a, b) => b.confianca - a.confianca);
+  return json({ texto: validas[0].texto, idioma: validas[0].lang,
+                confianca: validas[0].confianca, tentativas }, 200, livre);
+}
+
 async function vozesAzure(env, livre){
   if(!env.AZURE_KEY || !env.AZURE_REGION) return json([], 503, livre);
   const r = await fetch(
@@ -290,6 +339,7 @@ export default {
     if (url.pathname === "/api/alunos") return alunos(request, env, livre);
     if (url.pathname === "/api/voz" && request.method === "POST") return vozAzure(request, env, livre);
     if (url.pathname === "/api/vozes") return vozesAzure(env, livre);
+    if (url.pathname === "/api/ouvir" && request.method === "POST") return ouvirAzure(request, env, livre);
 
     // Quais modelos esta chave pode usar. O Google aposenta modelo sem aviso,
     // entao a lista vem dele, nao de uma constante no codigo.

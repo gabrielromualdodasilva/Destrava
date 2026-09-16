@@ -291,7 +291,16 @@
 
   .composer{display:flex; gap:8px; align-items:flex-end; margin-top:14px}
   .composer .inp{flex:1; resize:none; max-height:120px; line-height:1.35}
-  .mic{flex:0 0 auto; width:46px; height:46px; border-radius:50%; border:0; background:var(--accent); color:var(--accent-ink); display:grid; place-items:center}
+  .mic{position:relative; flex:0 0 auto; width:46px; height:46px; border-radius:50%;
+    border:0; background:var(--accent); color:var(--accent-ink); display:grid; place-items:center}
+  /* etiqueta do idioma colada no microfone: um toque troca, sem ocupar linha */
+  .micLingua{
+    position:absolute; right:-6px; bottom:-4px; min-width:26px; padding:1px 5px;
+    border-radius:999px; border:2px solid var(--surface); background:var(--surface-2);
+    color:var(--ink-2); font-size:10px; font-weight:800; letter-spacing:.04em;
+    line-height:1.5; cursor:pointer;
+  }
+  .micLingua:hover{border-color:var(--accent); color:var(--accent)}
   .mic svg{width:21px; height:21px; stroke:currentColor; fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round}
   .mic.rec{background:var(--bad); animation:pulse 1.3s ease-in-out infinite}
   @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(158,51,39,.5)}50%{box-shadow:0 0 0 11px rgba(158,51,39,0)}}
@@ -1932,6 +1941,25 @@ function painelConversa(){
     onkeydown: ev => { if(ev.key === "Enter" && !ev.shiftKey){ ev.preventDefault(); enviar(); } }});
   const micBtn = h("button", {class:"mic", id:"mic", "aria-label":"Falar",
     html:`<svg viewBox="0 0 24 24">${ICO.falar}</svg>`, onclick:() => alternarMic(campo)});
+
+  /* O reconhecimento do navegador ouve uma lingua por vez — nao existe
+     deteccao automatica. Entao a escolha fica colada no microfone: um toque
+     na etiqueta troca, e ela mostra o que ele vai ouvir agora. */
+  if(TEM_MIC){
+    const marca = h("span", {class:"micLingua", role:"button", tabindex:"0",
+      title:"Toque para trocar o idioma que o microfone ouve"},
+      micPT ? "PT" : L().bandeira);
+    const trocar = ev => {
+      ev.stopPropagation(); ev.preventDefault();
+      micPT = !micPT;
+      marca.textContent = micPT ? "PT" : L().bandeira;
+      micBtn.setAttribute("aria-label", micPT ? "Falar em português" : `Falar em ${L().nome}`);
+    };
+    marca.addEventListener("click", trocar);
+    marca.addEventListener("keydown", ev => { if(ev.key === "Enter" || ev.key === " ") trocar(ev); });
+    micBtn.append(marca);
+    micBtn.setAttribute("aria-label", micPT ? "Falar em português" : `Falar em ${L().nome}`);
+  }
   const enviarBtn = h("button", {class:"btn primary", onclick:() => enviar()}, "Enviar");
 
   function bolha(quem, texto){
@@ -1985,7 +2013,10 @@ function painelConversa(){
   if(turnos.length === 0){
     lista.append(h("div", {class:"empty"},
       `Fale em ${L().adj} — nem que seja `, h("i", {}, L().oi), ` — ou pergunte em português.`,
-      h("br"), "Larissa corrige o que você tentou e explica o que você não sabe."));
+      h("br"), "Larissa corrige o que você tentou e explica o que você não sabe.",
+      TEM_MIC ? h("span", {}, h("br"),
+        h("small", {style:"opacity:.75"},
+          "No microfone, a etiqueta mostra em que idioma ele está ouvindo. Toque nela para trocar.")) : null));
   } else {
     for(const t of turnos){
       if(t.role === "user") bolha("me", t.content);
